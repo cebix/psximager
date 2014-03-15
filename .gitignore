@@ -1,0 +1,25 @@
+# Object files
+*.o
+
+# Executables
+src/psxbuild
+src/psxinject
+src/psxrip
+
+# Backups
+*~
+
+# Autoconf generated files
+.deps
+Makefile
+Makefile.in
+aclocal.m4
+autom4te.cache
+config.guess
+config.log
+config.status
+config.sub
+configure
+depcomp
+install-sh
+missing

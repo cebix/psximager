@@ -1,0 +1,28 @@
+Prerequisites
+=============
+
+A C++ compiler.
+
+Boost C++ libraries >= 1.50.0
+  http://www.boost.org/
+
+libcdio and libiso9660 >= 0.90
+  http://www.gnu.org/software/libcdio/
+
+libvcdinfo >= 0.7.27
+  http://www.gnu.org/software/vcdimager/
+
+
+Installation
+============
+
+PSXImager can be compiled and installed in the usual way:
+
+  $ ./bootstrap
+  $ ./configure
+  $ make
+  [become root if necessary]
+  # make install
+
+Installation is not strictly necessary; the three binaries built in the
+"src" directory are stand-alone.

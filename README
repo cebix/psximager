@@ -1,0 +1,335 @@
+PSXImager V1.0
+==============
+
+PSXImager is a collection of tools for dumping and (pre-)mastering
+PlayStation 1 ("PSX") CD-ROM images. It consists of three tools:
+
+ * psxrip
+   Dumps the contents of the data track of a binary CD image ("BIN/CUE") to
+   a directory tree plus a "catalog" file containing filesystem metadata.
+   
+ * psxbuild
+   The inverse of psxrip; takes a catalog file and a directory tree to
+   produce a binary CD image which can be burned to a CD medium.
+
+ * psxinject
+   Replaces the contents of a file inside a binary CD image.
+
+What sets PSXImager apart from standard ISO 9660 imaging tools is that
+PSXImager handles images in the CD-ROM XA format, which is what the
+PlayStation 1 uses.
+
+CD-ROM XA, defined by Sony and Philips, is an extension to the "Yellow Book"
+and ISO 9660 standards, and also used by Video and Photo CDs. The main
+extensions of XA are:
+
+ - CD-ROM sectors contain an additional 8 bytes of "subheader" data for
+   storing information related to audio/video files (data type, codec and
+   channel information, etc.).
+ - Directory entries contain more attributes, such as Unix-style owner/group
+   IDs and permissions,
+ - Most importantly, XA allows "Form 2" files with 2324 data bytes per
+   sector (as opposed to the regular 2048 bytes) which are recorded in
+   special CD-ROM sectors ("Mode 2, Form 2"). This allows storing more data
+   on a CD (up to ~740MB) at the cost of having no error correction for this
+   data. Form 2 files are primarily used for audio/video data, in particular
+   the FMVs of most PlayStation 1 games.
+
+"Red Book" CD-DA audio tracks are not handled by PSXImager.
+
+PSXImager is based on code from the GNU VCDImager project and uses the
+libcdio and libvcdinfo libraries for most of its work.
+
+
+psxrip
+------
+
+Usage: psxrip [OPTION...] <input>[.bin/cue] [<output_dir>]
+  -l, --lbn-table                 Create an LBN table
+  -v, --verbose                   Be verbose
+  -V, --version                   Display version information and exit
+  -?, --help                      Show this help message
+
+Reads the data track of the given input CD image and dumps the filesystem
+contents to a directory together with a "catalog" file which specifies the
+directory structure and contains additional metadata which is not in the
+filesystem dump.
+
+The input CD image must be in raw ("MODE2/2352") format. Only the first data
+track is dumped, additional data and audio tracks are ignored. All files in
+the CD filesystem are dumped, preserving the original directory tree
+structure and (uppercase) naming.
+
+If no output directory is specified, the basename of the input CD image is
+used. The catalog file will have the name "<output_dir>.cat". The format of
+the catalog file is explained in the section "Catalog File Syntax", below.
+
+Additionally, psxrip will dump the system area (the first 16 sectors of the
+CD image) to a file named "<output_dir>.sys". On the PlayStation 1, the
+system area is used for storing licensing information.
+
+With the option '-l', psxrip creates an additional file, "<output_dir>.lbn"
+which contains the hexadecimal start sector numbers (LBNs) and file sizes
+of each file in the filesystem. This is useful for ROM hacking because many
+PlayStation 1 games access files by sector number instead of going through
+the filesystem.
+
+Usage example:
+
+A CD image in the required format can be produced from a PlayStation 1 game
+CD with the cdrdao tool as follows:
+
+  cdrdao read-cd --read-raw --datafile GAME.bin GAME.toc
+  toc2cue GAME.toc GAME.cue
+
+The filesystem of the produced GAME.bin/cue can then be dumped with:
+
+  psxrip GAME.cue
+
+This will create a directory named "GAME" which contains the complete
+filesystem tree of the CD, plus a "GAME.cat" catalog file and a "GAME.sys"
+file with a dump of the system area of the CD.
+
+These files can be used with psxbuild to recreate a CD image of the game.
+
+
+psxbuild
+--------
+
+Usage: psxbuild [OPTION...] <input>[.cat] <output>
+  -v, --verbose                   Be verbose
+  -V, --version                   Display version information and exit
+  -?, --help                      Show this help message
+
+Creates a raw mode BIN/CUE CD image from a catalog file and a directory tree
+holding the contents of the CD filesystem.
+
+The directory structure, the files to be included in the image, and
+additional metadata are controlled by the specified input catalog file. The
+format of the catalog file is explained in the section "Catalog File
+Syntax", below.
+
+Although it is possible to build a CD image from scratch by providing a
+hand-written catalog file, it is recommended to dump a PlayStation 1 CD
+using psxrip and use the produced catalog file as a template.
+
+The files and directories to be included in the image must be placed in a
+directory which has the same name as the basename of the catalog file. The
+files will be written to the image in the order they appear in in the
+catalog. Files which are present in the directory but not specified in the
+catalog will be ignored.
+
+Usage example:
+
+Given a catalog file named "GAME.cat" and a directory named "GAME" which
+holds the filesystem tree of the CD, a CD image can be built with:
+
+  psxbuild GAME
+
+This will create the two files "GAME.bin" and "GAME.cue" which contain the
+CD image. They can either directly be used with a PlayStation 1 emulator, or
+the image be written to a CD using a standard CD burning application such as
+Brasero.
+
+Note 1: A CD produced in this way will not be bootable on original
+PlayStation hardware because the PlayStation checks a signature on the CD
+which is not reproducible using off-the-shelf CD burners. However, there are
+hardware modifications ("Modchips") available for the PlayStation which
+disable this check.
+
+Note 2: Rebuilding a CD image which has been dumped with psxrip is not
+guaranteed to preserve the start sector numbers (LBNs) of files. Since many
+PlayStation 1 games access their data files directly via sector numbers
+instead of going through the filesystem, a game whose image has been rebuilt
+with psxbuild may crash or not work correctly. In this case it will be
+necessary to adapt the game code to the changed LBNs.
+
+
+psxinject
+---------
+
+Usage: psxinject [OPTION...] <input>[.cue/bin] <repl_file_path> <new_file>
+  -v, --verbose                   Be verbose
+  -V, --version                   Display version information and exit
+  -?, --help                      Show this help message
+
+Replaces the contents of a file inside a raw mode BIN/CUE image with a file
+from the local filesystem, preserving the file's name, attributes, and start
+sector. This is useful when patching individual files without having to
+rebuild the entire CD image.
+
+The new file must not require a higher number of sectors in the image, i.e.
+shrinking a file is allowed, but extending it beyond sector boundaries is
+not. If the new file is significantly larger than the existing file the
+image must be rebuilt in its entirety using psxrip/psxbuild.
+
+Usage example:
+
+To replace the file with the path GFX/INTRO.TIM in the CD image GAME.bin/cue
+with the contents of the local file "new_intro.tim", use:
+
+  psxinject GAME.cue GFX/INTRO.TIM new_intro.tim
+
+
+Catalog File Syntax
+-------------------
+
+The catalog file is a plain-text file which specifies the directory
+structure and additional metadata of a PlayStation 1 CD image. It is
+produced by psxrip when dumping a CD image, and read by psxbuild to control
+the creation of a CD image.
+
+The syntax of the catalog file is line-based. Extra spaces and empty lines
+are ignored but each data item and each item opening or closing a section
+must be on a line of its own.
+
+A catalog file consists of three sections: The system area section, the
+volume section, and the root directory section. Each section is optional.
+
+* System area section:
+
+The system area section has the following syntax:
+
+system_area {
+  file "<file>"
+}
+
+<file> specifies the path name of the file which holds the data of the
+system area (first 16 sectors) of the CD image. It can have a maximum size
+of 32 KiB.
+
+Although this section is optional, the system area of a PlayStation 1 CD
+must contain special, region-specific licensing information in order for the
+CD to be bootable on a PlayStation. This data is not included with PSXImager.
+
+* Volume section:
+
+This section specifies metadata, most of which is stored in the ISO 9660
+primary volume descriptor of the CD image. It has the following syntax:
+
+volume {
+  system_id [<string>]
+  volume_id [<string>]
+  volume_set_id [<string>]
+  publisher_id [<string>]
+  preparer_id [<string>]
+  application_id [<string>]
+  copyright_file_id [<string>]
+  abstract_file_id [<string>]
+  bibliographic_file_id [<string>]
+  creation_date <YYYY-MM-DD hh:mm:ss.xx ofs>
+  modification_date <YYYY-MM-DD hh:mm:ss.xx ofs>
+  expiration_date <YYYY-MM-DD hh:mm:ss.xx ofs>
+  effective_data <YYYY-MM-DD hh:mm:ss.xx ofs>
+  default_uid <integer>
+  default_gid <integer>
+}
+
+All items in this section are optional. Unspecified items will be filled in
+with default (usually empty) values by psxbuild. Few (if any) PlayStation 1
+games actually use the information defined in the volume section.
+
+The meaning of the *_id and *_date items, and their possible values, are
+defined in the ISO 9660 and ECMA-119 standards. The convention for
+PlayStation 1 games is to set the system_id to "PLAYSTATION" and the
+volume_id to the name of the game in caps. The volume_id is also the name
+the CD will appear under when mounted on a PC.
+
+In the four *_date items, the "xx" part specifies hundreds of seconds, while
+the "ofs" part specifies the offset from GMT in fifteen-minute units,
+ranging from -48 (west) to 52 (east).
+
+The default_uid and default_gid items specify the UID and GID attributes
+(0..65535) of all files and directories on the CD when creating an image
+with psxbuild. These two items are not written by psxrip.
+
+* Root directory section:
+
+The root directory section recursively defines the entire filesystem tree
+of the CD image. It has the follwing syntax:
+
+dir [] {
+  file [<file1>]
+  xafile [<file2>]
+  ...
+  dir [<dir1>] {
+    file [<file3>]
+    xafile [<file4>]
+    ...
+    dir [<dir2>] {
+      ...
+    }
+  }
+  ...
+}
+
+A directory section may specify file items as well subdirectory sections,
+which in turn may contain files and subdirectories themselves.
+
+Each "file" item specifies an ordinary data file (2048 bytes/sector), while
+an "xafile" item specifies an XA Form 2 file with 2336 bytes/sector
+(the 8-byte XA subheader followed by 2324 bytes of data followed by 4 bytes
+of error detection (EDC) info per sector).
+
+The file and directory names should follow ISO 9660 level 1 conventions (8.3
+characters, only uppercase letters, digits, and underscores). The name of
+the root directory must be empty. File versions (like ";1") are not
+supported.
+
+There is no way of specifying additional per-file or per-directory metadata.
+Permissions are set to standard values and file creation dates are set to
+the volume creation date by psxbuild.
+
+Example catalog file:
+
+system_area {
+  file "license.sys"
+}
+
+volume {
+  system_id [PLAYSTATION]
+  volume_id [MYGAME]
+  publisher_id [CEBIX]
+  creation_date 2014-03-15 14:46:30.00 4
+}
+
+dir [] {
+  file [SYSTEM.CNF]
+  file [MYGAME.EXE]
+  dir [GFX] {
+    file [INTRO.TIM]
+    xafile [MOVIE.STR]
+  }
+}
+
+Together with a corresponding directory tree of files:
+
+  $ tree
+  .
+  |-- MYGAME
+  |   |-- GFX
+  |   |   |-- INTRO.TIM
+  |   |   `-- MOVIE.STR
+  |   |-- MYGAME.EXE
+  |   `-- SYSTEM.CNF
+  |-- MYGAME.cat
+  `-- license.sys
+
+a CD image can be built with:
+
+  $ psxbuild MYGAME
+  Reading catalog file "MYGAME.cat"...
+  Reading filesystem from directory "MYGAME"...
+  Image file written to "MYGAME.bin"
+  Cue file written to "MYGAME.cue"
+
+The root directory of the produced image will contain the files "SYSTEM.CNF"
+and "MYGAME.EXE", plus the directory "GFX" with its two files, "MOVIE.STR"
+being a Form 2 file.
+
+
+Author
+------
+
+Christian Bauer
+www.cebix.net
