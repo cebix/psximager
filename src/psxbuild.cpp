@@ -49,7 +49,7 @@ using boost::format;
 using namespace std;
 
 
-#define TOOL_VERSION "PSXBuild 1.0"
+#define TOOL_VERSION "PSXBuild 1.1"
 
 
 struct FileNode;
@@ -787,7 +787,7 @@ public:
 			f.read(data, blockSize);
 
 			if (file.isForm2) {
-				_vcd_make_raw_mode2(buffer, data, sector + file.firstSector);
+				_vcd_make_mode2(buffer, data + CDIO_CD_SUBHEADER_SIZE, sector + file.firstSector, data[0], data[1], data[2], data[3]);
 			} else {
 				_vcd_make_mode2(buffer, data, sector + file.firstSector, 0, 0, subMode, 0);
 			}
@@ -855,7 +855,7 @@ static void writeSystemArea(ofstream & image, const Catalog & cat)
 	for (size_t sector = numFileSectors; sector < numSystemSectors; ++sector) {
 
 		// Empty sectors
-		_vcd_make_mode2(buffer, data.get(), sector, 0, 0, 0x20, 0);
+		_vcd_make_mode2(buffer, data.get(), sector, 0, 0, SM_FORM2, 0);
 		image.write(buffer, CDIO_CD_FRAMESIZE_RAW);
 	}
 }
