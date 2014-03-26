@@ -1,4 +1,4 @@
-PSXImager V1.0
+PSXImager V1.1
 ==============
 
 PSXImager is a collection of tools for dumping and (pre-)mastering
@@ -96,7 +96,7 @@ These files can be used with psxbuild to recreate a CD image of the game.
 psxbuild
 --------
 
-Usage: psxbuild [OPTION...] <input>[.cat] <output>
+Usage: psxbuild [OPTION...] <input>[.cat] [<output>[.bin/cue]]
   -v, --verbose                   Be verbose
   -V, --version                   Display version information and exit
   -?, --help                      Show this help message
@@ -153,15 +153,17 @@ Usage: psxinject [OPTION...] <input>[.cue/bin] <repl_file_path> <new_file>
   -V, --version                   Display version information and exit
   -?, --help                      Show this help message
 
-Replaces the contents of a file inside a raw mode BIN/CUE image with a file
-from the local filesystem, preserving the file's name, attributes, and start
-sector. This is useful when patching individual files without having to
-rebuild the entire CD image.
+Replaces the contents of a file inside a standard or raw mode BIN/CUE image
+with a file from the local filesystem, preserving the file's name,
+attributes, and start sector. This is useful when patching individual files
+without having to rebuild the entire CD image.
 
 The new file must not require a higher number of sectors in the image, i.e.
 shrinking a file is allowed, but extending it beyond sector boundaries is
 not. If the new file is significantly larger than the existing file the
 image must be rebuilt in its entirety using psxrip/psxbuild.
+
+Form 2 files are not currently supported by psxinject.
 
 Usage example:
 
@@ -184,7 +186,8 @@ are ignored but each data item and each item opening or closing a section
 must be on a line of its own.
 
 A catalog file consists of three sections: The system area section, the
-volume section, and the root directory section. Each section is optional.
+volume section, and the root directory section. The first two sections are
+optional.
 
 * System area section:
 
@@ -224,6 +227,9 @@ volume {
   default_uid <integer>
   default_gid <integer>
 }
+
+(Note: The '[' and ']' brackets do not indicate optional items. They are
+used as actual string delimiters and must appear like this in the file.)
 
 All items in this section are optional. Unspecified items will be filled in
 with default (usually empty) values by psxbuild. Few (if any) PlayStation 1
@@ -267,9 +273,14 @@ A directory section may specify file items as well subdirectory sections,
 which in turn may contain files and subdirectories themselves.
 
 Each "file" item specifies an ordinary data file (2048 bytes/sector), while
-an "xafile" item specifies an XA Form 2 file with 2336 bytes/sector
-(the 8-byte XA subheader followed by 2324 bytes of data followed by 4 bytes
-of error detection (EDC) info per sector).
+an "xafile" item specifies an XA Form 2 file holding 2336 bytes/sector (the
+8-byte XA subheader followed by 2324 bytes of data followed by 4 bytes of
+error detection (EDC) info per sector). An "xafile" can also interleave Form
+1 sectors which are stored in "raw" (2336 bytes/sector) format (8-byte XA
+subheader, 2048 data bytes, 4 bytes EDC, 276 bytes ECC).
+
+psxbuild recalculates the EDC/ECC data of XA files when writing them to the
+output image.
 
 The file and directory names should follow ISO 9660 level 1 conventions (8.3
 characters, only uppercase letters, digits, and underscores). The name of

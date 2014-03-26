@@ -864,7 +864,7 @@ static void writeSystemArea(ofstream & image, const Catalog & cat)
 // Print usage information and exit.
 static void usage(const char * progname, int exitcode = 0, const string & error = "")
 {
-	cout << "Usage: " << boost::filesystem::path(progname).filename().native() << " [OPTION...] <input>[.cat] <output>" << endl;
+	cout << "Usage: " << boost::filesystem::path(progname).filename().native() << " [OPTION...] <input>[.cat] [<output>[.bin/cue]]" << endl;
 	cout << "  -v, --verbose                   Be verbose" << endl;
 	cout << "  -V, --version                   Display version information and exit" << endl;
 	cout << "  -?, --help                      Show this help message" << endl;

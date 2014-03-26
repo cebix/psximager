@@ -25,4 +25,4 @@ PSXImager can be compiled and installed in the usual way:
   # make install
 
 Installation is not strictly necessary; the three binaries built in the
-"src" directory are stand-alone.
+"src" directory are stand-alone programs.
