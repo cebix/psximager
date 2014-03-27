@@ -1,6 +1,6 @@
 dnl Information on the package.
 AC_PREREQ(2.69)
-AC_INIT([PSXImager], [1.0], [cb@cebix.net], [psximager])
+AC_INIT([PSXImager], [1.1], [cb@cebix.net], [psximager])
 AC_CONFIG_SRCDIR([src/psxrip.cpp])
 AM_INIT_AUTOMAKE([1.12 foreign])
 
