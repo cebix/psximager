@@ -163,8 +163,6 @@ shrinking a file is allowed, but extending it beyond sector boundaries is
 not. If the new file is significantly larger than the existing file the
 image must be rebuilt in its entirety using psxrip/psxbuild.
 
-Form 2 files are not currently supported by psxinject.
-
 Usage example:
 
 To replace the file with the path GFX/INTRO.TIM in the CD image GAME.bin/cue

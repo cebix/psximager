@@ -42,7 +42,7 @@ using boost::format;
 using namespace std;
 
 
-#define TOOL_VERSION "PSXInject 1.0"
+#define TOOL_VERSION "PSXInject 1.1"
 
 
 // Print usage information and exit.
@@ -127,7 +127,7 @@ int main(int argc, char ** argv)
 			throw runtime_error((format("First track (%1%) is not a data track") % firstTrack).str());
 		}
 
-		bool isMode2 = (trackFormat == TRACK_FORMAT_XA);
+		bool imageIsMode2 = (trackFormat == TRACK_FORMAT_XA);
 
 		// Find the file in the image
 		if (!iso9660_fs_read_superblock(image, ISO_EXTENSION_NONE)) {
@@ -142,17 +142,38 @@ int main(int argc, char ** argv)
 			throw runtime_error((format("'%1%' does not refer to a file") % replFilePath).str());
 		}
 
+		bool fileIsForm2 = false;
+		if (stat->b_xa) {
+			uint16_t attr = uint16_from_be(stat->xa.attributes);
+			if (attr & (XA_ATTR_MODE2FORM2 | XA_ATTR_INTERLEAVED)) {
+				fileIsForm2 = true;
+			}
+		}
+
 		uint32_t extent = stat->lsn;
 		uint32_t maxSectors = stat->secsize;
-		cdio_info("'%s' found at LBN %d, length = %d sectors", replFilePath.c_str(), extent, maxSectors);
+		cdio_info("'%s' (form %d) found at LBN %d, length = %d sectors (%d bytes)", replFilePath.c_str(), fileIsForm2 ? 2 : 1, extent, maxSectors, stat->size);
 
 		// Check the new file
 		uintmax_t newSize = boost::filesystem::file_size(newFileName);
+		size_t blockSize = fileIsForm2 ? M2RAW_SECTOR_SIZE : ISO_BLOCKSIZE;
 
-		uint32_t numSectors = (newSize + ISO_BLOCKSIZE - 1) / ISO_BLOCKSIZE;
+		if (fileIsForm2) {
+			if (!imageIsMode2) {
+				throw runtime_error((format("'%1%' is a form 2 file but '%2%' is not a raw mode 2 image")
+				                     % replFilePath % imagePath).str());
+			}
+
+			if (newSize % blockSize != 0) {
+				throw runtime_error((format("'%1%' is a form 2 file but the size of %2% is not a multiple of %3% bytes")
+				                     % replFilePath % newFileName % blockSize).str());
+			}
+		}
+
+		uint32_t numSectors = (newSize + blockSize - 1) / blockSize;
 		if (numSectors > maxSectors) {
 			throw runtime_error((format("%1% would require %2% sectors but there is only room for %3% sectors (%4% bytes)")
-			                     % newFileName % numSectors % maxSectors % (maxSectors * ISO_BLOCKSIZE)).str());
+			                     % newFileName % numSectors % maxSectors % (maxSectors * blockSize)).str());
 		}
 
 		// Find the directory in the image
@@ -201,15 +222,15 @@ int main(int argc, char ** argv)
 				}
 
 				// Get record type, skip directories
-				uint8_t type = dirBuffer[offset + 25];
+				uint8_t type = dirBuffer[offset + offsetof(iso9660_dir_t, file_flags)];
 				if (type & ISO_DIRECTORY) {
 					offset += recLen;
 					continue;
 				}
 
 				// Compare file name
-				size_t nameLen = dirBuffer[offset + 32];
-				if (string((char *) dirBuffer + offset + 33, nameLen) == searchName) {
+				size_t nameLen = dirBuffer[offset + offsetof(iso9660_dir_t, filename)];
+				if (string((char *) dirBuffer + offset + offsetof(iso9660_dir_t, filename) + 1, nameLen) == searchName) {
 
 					// Found it
 					dirSector = dirSector + sector;
@@ -238,22 +259,28 @@ int main(int argc, char ** argv)
 			throw runtime_error((format("Cannot open file %1%") % newFileName).str());
 		}
 
-		char data[ISO_BLOCKSIZE];
+		char data[M2RAW_SECTOR_SIZE];
 		uint8_t buffer[CDIO_CD_FRAMESIZE_RAW];
-		uint32_t outputBlockSize = isMode2 ? CDIO_CD_FRAMESIZE_RAW : ISO_BLOCKSIZE;
+		uint32_t outputBlockSize = imageIsMode2 ? CDIO_CD_FRAMESIZE_RAW : ISO_BLOCKSIZE;
 
 		for (size_t sector = 0; sector < numSectors; ++sector) {
-			memset(data, 0, ISO_BLOCKSIZE);
-			file.read(data, ISO_BLOCKSIZE);
+			memset(data, 0, sizeof(data));
+			file.read(data, blockSize);
 
 			writeImage.seekp((extent + sector) * outputBlockSize);
 
-			if (isMode2) {
+			if (imageIsMode2) {
 				uint8_t subMode = SM_DATA;
 				if (sector == numSectors - 1) {
 					subMode |= (SM_EOF | SM_EOR);  // last sector
 				}
-				_vcd_make_mode2(buffer, data, extent + sector, 0, 0, subMode, 0);
+
+				if (fileIsForm2) {
+					_vcd_make_mode2(buffer, data + CDIO_CD_SUBHEADER_SIZE, extent + sector, data[0], data[1], data[2], data[3]);
+				} else {
+					_vcd_make_mode2(buffer, data, extent + sector, 0, 0, subMode, 0);
+				}
+
 				writeImage.write((char *)buffer, CDIO_CD_FRAMESIZE_RAW);
 			} else {
 				writeImage.write(data, ISO_BLOCKSIZE);
@@ -261,10 +288,14 @@ int main(int argc, char ** argv)
 		}
 
 		// Replace the file size in the directory record and write it back
-		*reinterpret_cast<iso733_t *>(dirBuffer + dirOffset + 10) = to_733(newSize);
+		if (fileIsForm2) {
+			*reinterpret_cast<iso733_t *>(dirBuffer + dirOffset + 10) = to_733(numSectors * ISO_BLOCKSIZE);
+		} else {
+			*reinterpret_cast<iso733_t *>(dirBuffer + dirOffset + 10) = to_733(newSize);
+		}
 
 		writeImage.seekp(dirSector * outputBlockSize);
-		if (isMode2) {
+		if (imageIsMode2) {
 			uint8_t subMode = SM_DATA;
 			if (isLastDirSector) {
 				subMode |= (SM_EOF | SM_EOR);  // last sector
