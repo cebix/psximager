@@ -43,7 +43,7 @@ using boost::format;
 using namespace std;
 
 
-#define TOOL_VERSION "PSXRip 1.0"
+#define TOOL_VERSION "PSXRip 1.2"
 
 
 // Sector buffer
@@ -153,8 +153,8 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, ofstream & lbnTab
 			bool form2File = false;
 			if (stat->b_xa) {
 				uint16_t attr = uint16_from_be(stat->xa.attributes);
-				if (attr & XA_ATTR_MODE2FORM2) {
-					cdio_info("XA file '%s' size = %u, secsize = %u, , group_id = %d, user_id = %d, attributes = %04x, filenum = %d",
+				if (attr & (XA_ATTR_MODE2FORM2 | XA_ATTR_INTERLEAVED)) {
+					cdio_info("XA file '%s' size = %u, secsize = %u, group_id = %d, user_id = %d, attributes = %04x, filenum = %d",
 					          entryName.c_str(), stat->size, stat->secsize, stat->xa.group_id, stat->xa.user_id, attr, stat->xa.filenum);
 					form2File = true;
 				}
