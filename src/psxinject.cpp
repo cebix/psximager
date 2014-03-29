@@ -42,7 +42,7 @@ using boost::format;
 using namespace std;
 
 
-#define TOOL_VERSION "PSXInject 1.1"
+#define TOOL_VERSION "PSXInject 1.2"
 
 
 // Print usage information and exit.
