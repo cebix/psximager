@@ -49,7 +49,7 @@ using boost::format;
 using namespace std;
 
 
-#define TOOL_VERSION "PSXBuild 1.1"
+#define TOOL_VERSION "PSXBuild 1.2"
 
 
 struct FileNode;
@@ -182,6 +182,10 @@ struct FileNode : public FSNode {
 		// Calculate the number of sectors in the file extent
 		size_t blockSize = isForm2 ? M2RAW_SECTOR_SIZE : ISO_BLOCKSIZE;
 		numSectors = (size + blockSize - 1) / blockSize;
+
+		if (numSectors == 0) {
+			numSectors = 1;  // empty files use one sector
+		}
 	}
 
 	// Size in bytes
