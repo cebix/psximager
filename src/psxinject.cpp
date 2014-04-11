@@ -171,6 +171,10 @@ int main(int argc, char ** argv)
 		}
 
 		uint32_t numSectors = (newSize + blockSize - 1) / blockSize;
+		if (numSectors == 0) {
+			numSectors = 1;  // empty files use one sector
+		}
+
 		if (numSectors > maxSectors) {
 			throw runtime_error((format("%1% would require %2% sectors but there is only room for %3% sectors (%4% bytes)")
 			                     % newFileName % numSectors % maxSectors % (maxSectors * blockSize)).str());
