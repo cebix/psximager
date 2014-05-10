@@ -45,7 +45,8 @@ psxrip
 ------
 
 Usage: psxrip [OPTION...] <input>[.bin/cue] [<output_dir>]
-  -l, --lbn-table                 Create an LBN table
+  -l, --lbn-table                 Write LBNs to catalog file
+  -t, --lbn-table                 Print LBN table and exit
   -v, --verbose                   Be verbose
   -V, --version                   Display version information and exit
   -?, --help                      Show this help message
@@ -68,11 +69,20 @@ Additionally, psxrip will dump the system area (the first 16 sectors of the
 CD image) to a file named "<output_dir>.sys". On the PlayStation 1, the
 system area is used for storing licensing information.
 
-With the option '-l', psxrip creates an additional file, "<output_dir>.lbn"
-which contains the hexadecimal start sector numbers (LBNs) and file sizes
-of each file in the filesystem. This is useful for ROM hacking because many
-PlayStation 1 games access files by sector number instead of going through
-the filesystem.
+With the option '-l', psxrip will also write the start sector numbers (LBNs)
+of all files and directories to the catalog file.
+
+When invoked with the option '-t', psxrip will not dump the filesystem of
+the image but instead print a table which lists
+ - the start LBN (hex)
+ - the number of sectors used (hex)
+ - the file or directory size (hex)
+ - the item type ('d' = directory, 'f' = regular file, 'x' = XA Form 2 file,
+   'a' = CD-DA audio file)
+ - the path name of the item
+for each file and directory in the filesystem. This is useful for ROM
+hacking because many PlayStation 1 games access files by sector number
+instead of going through the filesystem.
 
 Usage example:
 
@@ -96,7 +106,8 @@ These files can be used with psxbuild to recreate a CD image of the game.
 psxbuild
 --------
 
-Usage: psxbuild [OPTION...] <input>[.cat] [<output>[.bin/cue]]
+Usage: psxbuild [OPTION...] <input>[.cat] [<output>[.bin]]
+  -c, --cuefile                   Create a .cue file
   -v, --verbose                   Be verbose
   -V, --version                   Display version information and exit
   -?, --help                      Show this help message
@@ -124,7 +135,7 @@ Usage example:
 Given a catalog file named "GAME.cat" and a directory named "GAME" which
 holds the filesystem tree of the CD, a CD image can be built with:
 
-  psxbuild GAME
+  psxbuild -c GAME
 
 This will create the two files "GAME.bin" and "GAME.cue" which contain the
 CD image. They can either directly be used with a PlayStation 1 emulator, or
@@ -148,7 +159,7 @@ necessary to adapt the game code to the changed LBNs.
 psxinject
 ---------
 
-Usage: psxinject [OPTION...] <input>[.cue/bin] <repl_file_path> <new_file>
+Usage: psxinject [OPTION...] <input>[.bin/cue] <repl_file_path> <new_file>
   -v, --verbose                   Be verbose
   -V, --version                   Display version information and exit
   -?, --help                      Show this help message
@@ -158,7 +169,7 @@ with a file from the local filesystem, preserving the file's name,
 attributes, and start sector. This is useful when patching individual files
 without having to rebuild the entire CD image.
 
-The new file must not require a higher number of sectors in the image, i.e.
+The new file must not require a greater number of sectors in the image, i.e.
 shrinking a file is allowed, but extending it beyond sector boundaries is
 not. If the new file is significantly larger than the existing file the
 image must be rebuilt in its entirety using psxrip/psxbuild.
@@ -209,15 +220,15 @@ This section specifies metadata, most of which is stored in the ISO 9660
 primary volume descriptor of the CD image. It has the following syntax:
 
 volume {
-  system_id [<string>]
-  volume_id [<string>]
-  volume_set_id [<string>]
-  publisher_id [<string>]
-  preparer_id [<string>]
-  application_id [<string>]
-  copyright_file_id [<string>]
-  abstract_file_id [<string>]
-  bibliographic_file_id [<string>]
+  system_id '[' <string> ']'
+  volume_id '[' <string> ']'
+  volume_set_id '[' <string> ']'
+  publisher_id '[' <string> ']'
+  preparer_id '[' <string> ']'
+  application_id '[' <string> ']'
+  copyright_file_id '[' <string> ']'
+  abstract_file_id '[' <string> ']'
+  bibliographic_file_id '[' <string> ']'
   creation_date <YYYY-MM-DD hh:mm:ss.xx ofs>
   modification_date <YYYY-MM-DD hh:mm:ss.xx ofs>
   expiration_date <YYYY-MM-DD hh:mm:ss.xx ofs>
@@ -225,9 +236,6 @@ volume {
   default_uid <integer>
   default_gid <integer>
 }
-
-(Note: The '[' and ']' brackets do not indicate optional items. They are
-used as actual string delimiters and must appear like this in the file.)
 
 All items in this section are optional. Unspecified items will be filled in
 with default (usually empty) values by psxbuild. Few (if any) PlayStation 1
@@ -252,15 +260,15 @@ with psxbuild. These two items are not written by psxrip.
 The root directory section recursively defines the entire filesystem tree
 of the CD image. It has the follwing syntax:
 
-dir [] {
-  file [<file1>]
-  xafile [<file2>]
+dir {
+  file <file1> [@<lbn>]
+  xafile <file2> [@<lbn>]
   ...
-  dir [<dir1>] {
-    file [<file3>]
-    xafile [<file4>]
+  dir <dir1> [@<lbn>] {
+    file <file3> [@<lbn>]
+    xafile <file4> [@<lbn>]
     ...
-    dir [<dir2>] {
+    dir <dir2> [@<lbn>] {
       ...
     }
   }
@@ -285,6 +293,13 @@ characters, only uppercase letters, digits, and underscores). The name of
 the root directory must be empty. File versions (like ";1") are not
 supported.
 
+The "@<lbn>" part of file and directory items is optional. If present, it
+specifies the start sector number (LBN) of the file's or directory's extent.
+When creating a CD image, LBN specifications must appear in ascending order
+in the catalog; it is not possible to place an item at a lower start sector
+than the previous item, or to overlap items. When psxbuild detects this case
+it will print a warning message and move the item to the next free sector.
+
 There is no way of specifying additional per-file or per-directory metadata.
 Permissions are set to standard values and file creation dates are set to
 the volume creation date by psxbuild.
@@ -302,12 +317,12 @@ volume {
   creation_date 2014-03-15 14:46:30.00 4
 }
 
-dir [] {
-  file [SYSTEM.CNF]
-  file [MYGAME.EXE]
-  dir [GFX] {
-    file [INTRO.TIM]
-    xafile [MOVIE.STR]
+dir {
+  file SYSTEM.CNF
+  file MYGAME.EXE
+  dir GFX {
+    file INTRO.TIM
+    xafile MOVIE.STR @1000
   }
 }
 
@@ -333,8 +348,9 @@ a CD image can be built with:
   Cue file written to "MYGAME.cue"
 
 The root directory of the produced image will contain the files "SYSTEM.CNF"
-and "MYGAME.EXE", plus the directory "GFX" with its two files, "MOVIE.STR"
-being a Form 2 file.
+and "MYGAME.EXE", plus the directory "GFX" with its two files "INTRO.TIM"
+and "MOVIE.STR", the latter being a Form 2 file. The "MOVIE.STR" file will
+start at sector 1000, if possible.
 
 
 Author

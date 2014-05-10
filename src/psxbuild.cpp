@@ -59,6 +59,12 @@ struct DirNode;
 // Mode 2 raw sector buffer
 static char buffer[CDIO_CD_FRAMESIZE_RAW];
 
+// Empty Form 2 sector
+static const uint8_t emptySector[M2F2_SECTOR_SIZE] = {0};
+
+// Maximum number of sectors in an image
+const uint32_t MAX_ISO_SECTORS = 74 * 60 * 75;  // 74 minutes
+
 
 // Create an ISO long-format time structure from an ISO8601-like string
 static void parse_ltime(const string & s, iso9660_ltime_t & t)
@@ -122,8 +128,8 @@ public:
 
 // Base class for filesystem node
 struct FSNode {
-	FSNode(const string & name_, const boost::filesystem::path & path_, DirNode * parent_)
-		: parent(parent_), name(name_), path(path_), firstSector(0), numSectors(0) { }
+	FSNode(const string & name_, const boost::filesystem::path & path_, DirNode * parent_, uint32_t startSector_ = 0)
+		: parent(parent_), name(name_), path(path_), firstSector(0), numSectors(0), requestedStartSector(startSector_) { }
 
 	virtual ~FSNode() { }
 
@@ -147,6 +153,9 @@ struct FSNode {
 
 	// Size in sectors
 	uint32_t numSectors;
+
+	// First logical sector number requested in catalog (0 = don't care)
+	uint32_t requestedStartSector;
 
 	// Polymorphic helper method for accepting a visitor
 	virtual void accept(Visitor &) = 0;
@@ -173,8 +182,8 @@ struct CmpByName {
 
 // File (leaf) node
 struct FileNode : public FSNode {
-	FileNode(const string & name_, const boost::filesystem::path & path_, DirNode * parent_, bool isForm2_ = false)
-		: FSNode(name_, path_, parent_), isForm2(isForm2_)
+	FileNode(const string & name_, const boost::filesystem::path & path_, DirNode * parent_, uint32_t startSector_ = 0, bool isForm2_ = false)
+		: FSNode(name_, path_, parent_, startSector_), isForm2(isForm2_)
 	{
 		// Check for the existence of the file and obtain its size
 		size = boost::filesystem::file_size(path);
@@ -200,8 +209,8 @@ struct FileNode : public FSNode {
 
 // Directory node
 struct DirNode : public FSNode {
-	DirNode(const string & name_, const boost::filesystem::path & path_, DirNode * parent_ = NULL)
-		: FSNode(name_, path_, parent_), data(NULL), recordNumber(0) { }
+	DirNode(const string & name_, const boost::filesystem::path & path_, DirNode * parent_ = NULL, uint32_t startSector_ = 0)
+		: FSNode(name_, path_, parent_, startSector_), data(NULL), recordNumber(0) { }
 
 	// Pointer to directory extent data
 	uint8_t * data;
@@ -342,6 +351,25 @@ static void checkFileName(const string & s, const string & description)
 			throw runtime_error((format("Illegal character '%1%' in %2% \"%3%\"") % c % description % s).str());
 		}
 	}
+}
+
+
+// Check that the given string represents a valid sector number and
+// convert it to an integer. Returns 0 if the string is empty;
+static uint32_t checkLBN(const string & s, const string & itemName)
+{
+	uint32_t lbn = 0;
+	if (!s.empty()) {
+		try {
+			lbn = boost::lexical_cast<uint32_t>(s);
+			if (lbn <= ISO_EVD_SECTOR || lbn >= MAX_ISO_SECTORS) {
+				throw runtime_error((format("Start LBN '%1%' of '%2%' is outside the valid range %3%..%4%") % s % itemName % ISO_EVD_SECTOR % MAX_ISO_SECTORS).str());
+			}
+		} catch (const boost::bad_lexical_cast &) {
+			throw runtime_error((format("Invalid start LBN '%1%' specified for '%2%'") % s % itemName).str());
+		}
+	}
+	return lbn;
 }
 
 
@@ -505,9 +533,9 @@ static void parseVolume(ifstream & catalogFile, Catalog & cat)
 
 
 // Recursively parse a "dir" section of the catalog file.
-static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & dirName, const boost::filesystem::path & path, DirNode * parent = NULL)
+static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & dirName, const boost::filesystem::path & path, DirNode * parent = NULL, uint32_t startSector = 0)
 {
-	DirNode * dir = new DirNode(dirName, path, parent);
+	DirNode * dir = new DirNode(dirName, path, parent, startSector);
 
 	while (true) {
 		string line = nextline(catalogFile);
@@ -515,9 +543,9 @@ static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & 
 			throw runtime_error((format("Syntax error in catalog file: unterminated directory section \"%1%\"") % dirName).str());
 		}
 
-		static const boost::regex fileSpec("file\\s*\\[(.+)\\]");
-		static const boost::regex xaFileSpec("xafile\\s*\\[(.+)\\]");
-		static const boost::regex dirStart("dir\\s*\\[(.+)\\]\\s*\\{");
+		static const boost::regex fileSpec("file\\s*(\\S+)(?:\\s*@(\\d+))?");
+		static const boost::regex xaFileSpec("xafile\\s*(\\S+)(?:\\s*@(\\d+))?");
+		static const boost::regex dirStart("dir\\s*(\\S+)(?:\\s*@(\\d+))?\\s*\\{");
 		boost::smatch m;
 
 		if (line == "}") {
@@ -531,7 +559,9 @@ static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & 
 			string fileName = m[1];
 			checkFileName(fileName, "file name");
 
-			FileNode * file = new FileNode(fileName + ";1", path / fileName, dir);
+			uint32_t startSector = checkLBN(m[2], fileName);
+
+			FileNode * file = new FileNode(fileName + ";1", path / fileName, dir, startSector);
 			dir->children.push_back(file);
 
 		} else if (boost::regex_match(line, m, xaFileSpec)) {
@@ -540,7 +570,9 @@ static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & 
 			string fileName = m[1];
 			checkFileName(fileName, "file name");
 
-			FileNode * file = new FileNode(fileName + ";1", path / fileName, dir, true);
+			uint32_t startSector = checkLBN(m[2], fileName);
+
+			FileNode * file = new FileNode(fileName + ";1", path / fileName, dir, startSector, true);
 			dir->children.push_back(file);
 
 		} else if (boost::regex_match(line, m, dirStart)) {
@@ -549,7 +581,9 @@ static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & 
 			string subDirName = m[1];
 			checkDString(subDirName, "directory name");
 
-			DirNode * subDir = parseDir(catalogFile, cat, subDirName, path / subDirName, dir);
+			uint32_t startSector = checkLBN(m[2], subDirName);
+
+			DirNode * subDir = parseDir(catalogFile, cat, subDirName, path / subDirName, dir, startSector);
 			dir->children.push_back(subDir);
 
 		} else {
@@ -578,7 +612,7 @@ static void parseCatalog(ifstream & catalogFile, Catalog & cat, const boost::fil
 
 		static const boost::regex systemAreaStart("system_area\\s*\\{");
 		static const boost::regex volumeStart("volume\\s*\\{");
-		static const boost::regex rootDirStart("dir\\s*\\[\\]\\s*\\{");
+		static const boost::regex rootDirStart("dir\\s*\\{");
 
 		if (boost::regex_match(line, systemAreaStart)) {
 
@@ -656,21 +690,39 @@ public:
 // the "firstSector" field of all nodes
 class AllocSectors : public Visitor {
 public:
-	AllocSectors(uint32_t startSector) : currentSector(startSector) { }
+	AllocSectors(uint32_t startSector_) : currentSector(startSector_) { }
 
 	uint32_t getCurrentSector() const { return currentSector; }
 
-	void visit(DirNode & dir)
+	void visitNode(FSNode & node)
 	{
-		dir.firstSector = currentSector;
-		currentSector += dir.numSectors;
+		// Minimum start sector requested?
+		if (node.requestedStartSector) {
+
+			// Yes, before current sector?
+			if (node.requestedStartSector < currentSector) {
+
+				// Yes, ignore the request and print a warning
+				node.firstSector = currentSector;
+				cerr << "Warning: " << node.path << " will start at sector " << node.firstSector << " instead of " << node.requestedStartSector << endl;
+
+			} else {
+
+				// Heed the request
+				node.firstSector = node.requestedStartSector;
+			}
+
+		} else {
+
+			// Allocate contiguously
+			node.firstSector = currentSector;
+		}
+
+		currentSector = node.firstSector + node.numSectors;
 	}
 
-	void visit(FileNode & file)
-	{
-		file.firstSector = currentSector;
-		currentSector += file.numSectors;
-	}
+	void visit(DirNode & dir) { visitNode(dir); }
+	void visit(FileNode & file) { visitNode(file); }
 
 private:
 	uint32_t currentSector;
@@ -767,7 +819,7 @@ private:
 // Visitor which writes all directory and file data to the image file
 class WriteData : public Visitor {
 public:
-	WriteData(ofstream & image_) : image(image_) { }
+	WriteData(ofstream & image_, uint32_t startSector_) : image(image_), currentSector(startSector_) { }
 
 	void visit(FileNode & file)
 	{
@@ -777,6 +829,8 @@ public:
 		}
 
 		cdio_info("Writing \"%s\"...", file.path.c_str());
+
+		writeGap(file.firstSector);
 
 		char data[M2RAW_SECTOR_SIZE];
 		size_t blockSize = file.isForm2 ? M2RAW_SECTOR_SIZE : ISO_BLOCKSIZE;
@@ -791,30 +845,48 @@ public:
 			f.read(data, blockSize);
 
 			if (file.isForm2) {
-				_vcd_make_mode2(buffer, data + CDIO_CD_SUBHEADER_SIZE, sector + file.firstSector, data[0], data[1], data[2], data[3]);
+				_vcd_make_mode2(buffer, data + CDIO_CD_SUBHEADER_SIZE, currentSector, data[0], data[1], data[2], data[3]);
 			} else {
-				_vcd_make_mode2(buffer, data, sector + file.firstSector, 0, 0, subMode, 0);
+				_vcd_make_mode2(buffer, data, currentSector, 0, 0, subMode, 0);
 			}
 
 			image.write(buffer, CDIO_CD_FRAMESIZE_RAW);
+
+			++currentSector;
 		}
 	}
 
 	void visit(DirNode & dir)
 	{
+		writeGap(dir.firstSector);
+
 		for (uint32_t sector = 0; sector < dir.numSectors; ++sector) {
 			uint8_t subMode = SM_DATA;
 			if (sector == dir.numSectors - 1) {
 				subMode |= (SM_EOF | SM_EOR);  // last sector
 			}
 
-			_vcd_make_mode2(buffer, dir.data + sector * ISO_BLOCKSIZE, sector + dir.firstSector, 0, 0, subMode, 0);
+			_vcd_make_mode2(buffer, dir.data + sector * ISO_BLOCKSIZE, currentSector, 0, 0, subMode, 0);
 			image.write(buffer, CDIO_CD_FRAMESIZE_RAW);
+
+			++currentSector;
+		}
+	}
+
+	// Write empty sectors as a gap until we reach the specified sector.
+	void writeGap(uint32_t until)
+	{
+		while (currentSector < until) {
+			_vcd_make_mode2(buffer, emptySector, currentSector, 0, 0, SM_FORM2, 0);
+			image.write(buffer, CDIO_CD_FRAMESIZE_RAW);
+
+			++currentSector;
 		}
 	}
 
 private:
 	ofstream & image;
+	uint32_t currentSector;
 };
 
 
@@ -854,12 +926,10 @@ static void writeSystemArea(ofstream & image, const Catalog & cat)
 		image.write(buffer, CDIO_CD_FRAMESIZE_RAW);
 	}
 
-	memset(data.get(), 0, systemAreaSize);
-
 	for (size_t sector = numFileSectors; sector < numSystemSectors; ++sector) {
 
 		// Empty sectors
-		_vcd_make_mode2(buffer, data.get(), sector, 0, 0, SM_FORM2, 0);
+		_vcd_make_mode2(buffer, emptySector, sector, 0, 0, SM_FORM2, 0);
 		image.write(buffer, CDIO_CD_FRAMESIZE_RAW);
 	}
 }
@@ -868,7 +938,8 @@ static void writeSystemArea(ofstream & image, const Catalog & cat)
 // Print usage information and exit.
 static void usage(const char * progname, int exitcode = 0, const string & error = "")
 {
-	cout << "Usage: " << boost::filesystem::path(progname).filename().native() << " [OPTION...] <input>[.cat] [<output>[.bin/cue]]" << endl;
+	cout << "Usage: " << boost::filesystem::path(progname).filename().native() << " [OPTION...] <input>[.cat] [<output>[.bin]]" << endl;
+    cout << "  -c, --cuefile                   Create a .cue file" << endl;
 	cout << "  -v, --verbose                   Be verbose" << endl;
 	cout << "  -V, --version                   Display version information and exit" << endl;
 	cout << "  -?, --help                      Show this help message" << endl;
@@ -888,6 +959,7 @@ int main(int argc, char ** argv)
 	boost::filesystem::path inputPath;
 	boost::filesystem::path outputPath;
 	bool verbose = false;
+	bool writeCueFile = false;
 
 	for (int i = 1; i < argc; ++i) {
 		string arg = argv[i];
@@ -895,6 +967,8 @@ int main(int argc, char ** argv)
 		if (arg == "--version" || arg == "-V") {
 			cout << TOOL_VERSION << endl;
 			return 0;
+		} else if (arg == "--cuefile" || arg == "-c") {
+			writeCueFile = true;
 		} else if (arg == "--verbose" || arg == "-v") {
 			cdio_loglevel_default = CDIO_LOG_INFO;
 			verbose = true;
@@ -967,6 +1041,10 @@ int main(int argc, char ** argv)
 		cat.root->traverse(alloc);  // must use the same traversal order as "WriteData" below
 
 		uint32_t volumeSize = alloc.getCurrentSector();
+		if (volumeSize > MAX_ISO_SECTORS) {
+			cerr << "Warning: Output image larger than "
+			     << (MAX_ISO_SECTORS * CDIO_CD_FRAMESIZE_RAW / (1024*1024)) << " MiB\n";
+		}
 
 		// Create the directory data
 		MakeDirectories makeDirs(cat);
@@ -1061,7 +1139,7 @@ int main(int argc, char ** argv)
 		image.write(buffer, CDIO_CD_FRAMESIZE_RAW);
 
 		// Write the directory and file data
-		WriteData writeData(image);
+		WriteData writeData(image, rootDirStartSector);
 		cat.root->traverse(writeData);  // must use the same traversal order as "AllocSectors" above
 
 		// Close the image file
@@ -1070,26 +1148,29 @@ int main(int argc, char ** argv)
 		}
 		image.close();
 
-		// Write the cue file
-		boost::filesystem::path cueName = outputPath;
-		cueName.replace_extension(".cue");
-
-		ofstream cueFile(cueName.c_str(), ofstream::out | ofstream::trunc);
-		if (!cueFile) {
-			throw runtime_error((format("Error creating cue file %1%") % cueName).str());
-		}
-
-		cueFile << "FILE " << imageName << " BINARY\r\n";
-		cueFile << "  TRACK 01 MODE2/2352\r\n";
-		cueFile << "    INDEX 01 00:00:00\r\n";
-
-		if (!cueFile) {
-			throw runtime_error((format("Error writing to cue file %1%") % cueName).str());
-		}
-		cueFile.close();
-
 		cout << "Image file written to " << imageName << endl;
-		cout << "Cue file written to " << cueName << endl;
+
+		// Write the cue file
+		if (writeCueFile) {
+			boost::filesystem::path cueName = outputPath;
+			cueName.replace_extension(".cue");
+
+			ofstream cueFile(cueName.c_str(), ofstream::out | ofstream::trunc);
+			if (!cueFile) {
+				throw runtime_error((format("Error creating cue file %1%") % cueName).str());
+			}
+
+			cueFile << "FILE " << imageName << " BINARY\r\n";
+			cueFile << "  TRACK 01 MODE2/2352\r\n";
+			cueFile << "    INDEX 01 00:00:00\r\n";
+
+			if (!cueFile) {
+				throw runtime_error((format("Error writing to cue file %1%") % cueName).str());
+			}
+			cueFile.close();
+
+			cout << "Cue file written to " << cueName << endl;
+		}
 
 		cdio_info("Done.");
 

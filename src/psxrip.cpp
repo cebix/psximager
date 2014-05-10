@@ -98,8 +98,9 @@ struct CmpByLSN {
 };
 
 
-// Recursively dump the contents of the ISO filesystem starting at 'dir' while extending the catalog file.
-static void dumpFilesystem(CdIo_t * image, ofstream & catalog, ofstream & lbnTable,
+// Recursively dump the contents of the ISO filesystem starting at 'dir'
+// while extending the catalog file.
+static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
 						   const boost::filesystem::path & outputPath, const string & inputPath = "",
 						   const string & dirName = "", unsigned level = 0)
 {
@@ -116,7 +117,16 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, ofstream & lbnTab
 	boost::filesystem::create_directory(outputDirName);
 
 	// Open the catalog record for the directory
-	catalog << string(level * 2, ' ') << "dir [" << dirName << "] {\n";
+	if (level == 0) {
+		catalog << "dir {\n";  // root
+	} else {
+		catalog << string(level * 2, ' ') << "dir " << dirName;
+		if (writeLBNs) {
+			iso9660_stat_t * stat = static_cast<iso9660_stat_t *>(_cdio_list_node_data(_cdio_list_begin(entries)));  // "." entry
+			catalog << " @" << stat->lsn;
+		}
+		catalog << " {\n";
+	}
 
 	// Sort entries by sector number
 	vector<iso9660_stat_t *> sortedChildren;
@@ -138,7 +148,7 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, ofstream & lbnTab
 
 			// Entry is a directory, recurse into it unless it is "." or ".."
 			if (entryName != "." && entryName != "..") {
-				dumpFilesystem(image, catalog, lbnTable, outputDirName, entryPath, entryName, level + 1);
+				dumpFilesystem(image, catalog, writeLBNs, outputDirName, entryPath, entryName, level + 1);
 			}
 
 		} else {
@@ -172,10 +182,11 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, ofstream & lbnTab
 			size_t fileSize = form2File ? stat->secsize * blockSize : stat->size;
 
 			// Write the catalog record for the file
-			catalog << string((level + 1) * 2, ' ') << (form2File ? "xa" : "") << "file [" << entryName << "]\n";
-
-			// Write the LBN table record for the file
-			lbnTable << boost::format("%08x %08x %s") % stat->lsn % fileSize % entryPath << endl;
+			catalog << string((level + 1) * 2, ' ') << (form2File ? "xa" : "") << "file " << entryName;
+			if (writeLBNs) {
+				catalog << " @" << stat->lsn;
+			}
+			catalog << "\n";
 
 			// Dump the file contents
 			boost::filesystem::path outputFileName = outputDirName / entryName;
@@ -220,11 +231,144 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, ofstream & lbnTab
 }
 
 
+// Dump image to system area data, catalog file, and output directory.
+static void dumpImage(CdIo_t * image, const boost::filesystem::path & outputPath, bool writeLBNs)
+{
+	// Read ISO volume information
+	iso9660_pvd_t pvd;
+	if (!iso9660_fs_read_pvd(image, &pvd)) {
+		throw runtime_error("Error reading ISO 9660 volume information");
+	}
+	cout << "Volume ID = " << iso9660_get_volume_id(&pvd) << endl;
+
+	// Construct names of output files
+	boost::filesystem::path catalogName = outputPath;
+	catalogName.replace_extension(".cat");
+
+	boost::filesystem::path systemAreaName = outputPath;
+	systemAreaName.replace_extension(".sys");
+
+	// Create output catalog file
+	ofstream catalog(catalogName.c_str(), ofstream::out | ofstream::trunc);
+	if (!catalog) {
+		throw runtime_error((format("Cannot create catalog file %1%") % catalogName).str());
+	}
+
+	// Dump system area data
+	dumpSystemArea(image, systemAreaName);
+
+	cout << "System area data written to " << systemAreaName << "\n";
+
+	catalog << "system_area {\n";
+	catalog << "  file " << systemAreaName << "\n";
+	catalog << "}\n\n";
+
+	// Output ISO volume information
+	catalog << "volume {\n";
+	catalog << "  system_id [" << iso9660_get_system_id(&pvd) << "]\n";
+	catalog << "  volume_id [" << iso9660_get_volume_id(&pvd) << "]\n";
+	catalog << "  volume_set_id [" << iso9660_get_volumeset_id(&pvd) << "]\n";
+	catalog << "  publisher_id [" << iso9660_get_publisher_id(&pvd) << "]\n";
+	catalog << "  preparer_id [" << iso9660_get_preparer_id(&pvd) << "]\n";
+	catalog << "  application_id [" << iso9660_get_application_id(&pvd) << "]\n";
+	catalog << "  copyright_file_id [" << vcdinfo_strip_trail(pvd.copyright_file_id, 37) << "]\n";
+	catalog << "  abstract_file_id [" << vcdinfo_strip_trail(pvd.abstract_file_id, 37) << "]\n";
+	catalog << "  bibliographic_file_id [" << vcdinfo_strip_trail(pvd.bibliographic_file_id, 37) << "]\n";
+	catalog << "  creation_date "; print_ltime(catalog, pvd.creation_date);
+	catalog << "  modification_date "; print_ltime(catalog, pvd.modification_date);
+	catalog << "  expiration_date "; print_ltime(catalog, pvd.expiration_date);
+	catalog << "  effective_date "; print_ltime(catalog, pvd.effective_date);
+	catalog << "}\n\n";
+
+	// Dump ISO filesystem
+	if (!iso9660_fs_read_superblock(image, ISO_EXTENSION_NONE)) {
+		throw runtime_error("Error reading ISO 9660 volume information");
+	}
+
+	cout << "Dumping filesystem to directory " << outputPath << "...\n";
+	dumpFilesystem(image, catalog, writeLBNs, outputPath);
+
+	// Close down
+	cout << "Catalog written to " << catalogName << "\n";
+}
+
+
+// Dump an LBN table of the image to the given output stream.
+static void dumpLBNTable(CdIo_t * image, const string & inputPath = "", ostream & output = cout)
+{
+	// Read the directory entries
+	CdioList_t * entries = iso9660_fs_readdir(image, inputPath.c_str(), false);
+	if (!entries) {
+		throw runtime_error((format("Error reading ISO 9660 directory '%1%'") % inputPath).str());
+	}
+
+	// Print table header before root directory
+	if (inputPath.empty()) {
+		output << boost::format("%8s %8s %8s T Path") % "LBN" % "NumSec" % "Size" << endl;
+	}
+
+	// Print entry for directory itself
+	iso9660_stat_t * stat = static_cast<iso9660_stat_t *>(_cdio_list_node_data(_cdio_list_begin(entries)));  // "." entry
+	output << boost::format("%08x %08x %08x d %s") % stat->lsn % stat->secsize % stat->size % inputPath << endl;
+
+	// Sort entries by sector number
+	vector<iso9660_stat_t *> sortedChildren;
+
+	CdioListNode_t * entry;
+	_CDIO_LIST_FOREACH(entry, entries) {
+		sortedChildren.push_back(static_cast<iso9660_stat_t *>(_cdio_list_node_data(entry)));
+	}
+
+	sort(sortedChildren.begin(), sortedChildren.end(), CmpByLSN());
+
+	// Print all directory entries
+	for (vector<iso9660_stat_t *>::const_iterator i = sortedChildren.begin(); i != sortedChildren.end(); ++i) {
+		stat = *i;
+
+		string entryName = stat->filename;
+		size_t versionSep = entryName.find_last_of(';');
+		if (versionSep != string::npos) {
+			entryName = entryName.substr(0, versionSep);  // strip version number
+		}
+
+		string entryPath = inputPath.empty() ? entryName : (inputPath + "/" + entryName);
+
+		if (stat->type == iso9660_stat_s::_STAT_DIR) {
+
+			// Entry is a directory, recurse into it unless it is "." or ".."
+			if (entryName != "." && entryName != "..") {
+				dumpLBNTable(image, entryPath, output);
+			}
+
+		} else {
+
+			// Entry is a file
+			size_t fileSize = stat->size;
+			char typeChar = 'f';
+
+			if (stat->b_xa) {
+				uint16_t attr = uint16_from_be(stat->xa.attributes);
+				if (attr & (XA_ATTR_MODE2FORM2 | XA_ATTR_INTERLEAVED)) {
+					typeChar = 'x';
+					fileSize = stat->secsize * M2RAW_SECTOR_SIZE;
+				}
+				if (attr & XA_ATTR_CDDA) {
+					typeChar = 'a';
+				}
+			}
+
+			output << boost::format("%08x %08x %08x %c %s") % stat->lsn % stat->secsize % fileSize % typeChar % entryPath << endl;
+		}
+	}
+}
+
+
 // Print usage information and exit.
 static void usage(const char * progname, int exitcode = 0, const string & error = "")
 {
 	cout << "Usage: " << boost::filesystem::path(progname).filename().native() << " [OPTION...] <input>[.bin/cue] [<output_dir>]" << endl;
-	cout << "  -l, --lbn-table                 Create an LBN table" << endl;
+	cout << "  -l, --lbns                      Write LBNs to catalog file" << endl;
+	cout << "  -t, --lbn-table                 Print LBN table and exit" << endl;
 	cout << "  -v, --verbose                   Be verbose" << endl;
 	cout << "  -V, --version                   Display version information and exit" << endl;
 	cout << "  -?, --help                      Show this help message" << endl;
@@ -243,7 +387,8 @@ int main(int argc, const char ** argv)
 	// Parse command line arguments
 	boost::filesystem::path inputPath;
 	boost::filesystem::path outputPath;
-	bool createLBNTable = false;
+	bool writeLBNs = false;
+	bool printLBNTable = false;
 
 	for (int i = 1; i < argc; ++i) {
 		string arg = argv[i];
@@ -251,8 +396,10 @@ int main(int argc, const char ** argv)
 		if (arg == "--version" || arg == "-V") {
 			cout << TOOL_VERSION << endl;
 			return 0;
-		} else if (arg == "--lbn-table" || arg == "-l") {
-			createLBNTable = true;
+		} else if (arg == "--lbns" || arg == "-l") {
+			writeLBNs = true;
+		} else if (arg == "--lbn-table" || arg == "-t") {
+			printLBNTable = true;
 		} else if (arg == "--verbose" || arg == "-v") {
 			cdio_loglevel_default = CDIO_LOG_INFO;
 		} else if (arg == "--help" || arg == "-?") {
@@ -331,79 +478,18 @@ int main(int argc, const char ** argv)
 			throw runtime_error("No ISO 9660 filesystem on data track");
 		}
 
-		// Construct names of output files
-		boost::filesystem::path catalogName = outputPath;
-		catalogName.replace_extension(".cat");
+		if (printLBNTable) {
 
-		boost::filesystem::path systemAreaName = outputPath;
-		systemAreaName.replace_extension(".sys");
+			// Print the LBN table
+			dumpLBNTable(image);
 
-		boost::filesystem::path lbnTableName = outputPath;
-		lbnTableName.replace_extension(".lbn");
+		} else {
 
-		// Read ISO volume information
-		iso9660_pvd_t pvd;
-		if (!iso9660_fs_read_pvd(image, &pvd)) {
-			throw runtime_error("Error reading ISO 9660 volume information");
-		}
-		cout << "Volume ID = " << iso9660_get_volume_id(&pvd) << endl;
-
-		// Create output catalog file
-		ofstream catalog(catalogName.c_str(), ofstream::out | ofstream::trunc);
-		if (!catalog) {
-			throw runtime_error((format("Cannot create catalog file %1%") % catalogName).str());
+			// Dump the input image
+			dumpImage(image, outputPath, writeLBNs);
 		}
 
-		// Create LBN table
-		ofstream lbnTable;
-		if (createLBNTable) {
-			lbnTable.open(lbnTableName.c_str(), ofstream::out | ofstream::trunc);
-			if (!lbnTable) {
-				throw runtime_error((format("Cannot create LBN table file %1%") % lbnTableName).str());
-			}
-		}
-
-		// Dump system area data
-		dumpSystemArea(image, systemAreaName);
-
-		cout << "System area data written to " << systemAreaName << "\n";
-
-		catalog << "system_area {\n";
-		catalog << "  file " << systemAreaName << "\n";
-		catalog << "}\n\n";
-
-		// Output ISO volume information
-		catalog << "volume {\n";
-		catalog << "  system_id [" << iso9660_get_system_id(&pvd) << "]\n";
-		catalog << "  volume_id [" << iso9660_get_volume_id(&pvd) << "]\n";
-		catalog << "  volume_set_id [" << iso9660_get_volumeset_id(&pvd) << "]\n";
-		catalog << "  publisher_id [" << iso9660_get_publisher_id(&pvd) << "]\n";
-		catalog << "  preparer_id [" << iso9660_get_preparer_id(&pvd) << "]\n";
-		catalog << "  application_id [" << iso9660_get_application_id(&pvd) << "]\n";
-		catalog << "  copyright_file_id [" << vcdinfo_strip_trail(pvd.copyright_file_id, 37) << "]\n";
-		catalog << "  abstract_file_id [" << vcdinfo_strip_trail(pvd.abstract_file_id, 37) << "]\n";
-		catalog << "  bibliographic_file_id [" << vcdinfo_strip_trail(pvd.bibliographic_file_id, 37) << "]\n";
-		catalog << "  creation_date "; print_ltime(catalog, pvd.creation_date);
-		catalog << "  modification_date "; print_ltime(catalog, pvd.modification_date);
-		catalog << "  expiration_date "; print_ltime(catalog, pvd.expiration_date);
-		catalog << "  effective_date "; print_ltime(catalog, pvd.effective_date);
-		catalog << "}\n\n";
-
-		// Dump ISO filesystem
-		if (!iso9660_fs_read_superblock(image, ISO_EXTENSION_NONE)) {
-			throw runtime_error("Error reading ISO 9660 volume information");
-		}
-
-		cout << "Dumping filesystem to directory " << outputPath << "...\n";
-		dumpFilesystem(image, catalog, lbnTable, outputPath);
-
-		// Close down
-		cout << "Catalog written to " << catalogName << "\n";
-
-		if (createLBNTable) {
-			cout << "LBN table written to " << lbnTableName << "\n";
-		}
-
+		// Close the input image
 		cdio_destroy(image);
 		cdio_info("Done.");
 
