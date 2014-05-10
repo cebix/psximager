@@ -1,0 +1,24 @@
+V2.0 (2014-05-10)
+ - The syntax of catalog files has changed slightly:
+    - File and directory names are no longer enclosed in [] brackets.
+    - The start sector of files and directories can optionally be specified
+      with "@<lbn>" after the item name.
+ - psxrip:
+    - The '-l' option now writes the LBNs of files and directories to the
+      catalog file instead of a separate LBN file.
+    - With the new '-t' option, psxrip prints an LBN table to the screen.
+    - Files which have the 'interleaved' flag but not the 'Form 2' flag set
+      in their directory record are now dumped as XA files.
+ - psxbuild:
+    - To create a .cue file along with the image you must now specify the
+      '-c' option.
+    - At least one sector is allocated for file extents, even for files of
+      zero length.
+ - psxinject:
+    - Injecting XA files is supported.
+
+V1.1 (2014-03-27)
+ - psxbuild recalculates the EDC/ECC data of XA files.
+
+V1.0 (2014-03-15)
+ - First public release
