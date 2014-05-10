@@ -42,13 +42,13 @@ using boost::format;
 using namespace std;
 
 
-#define TOOL_VERSION "PSXInject 1.2"
+#define TOOL_VERSION "PSXInject 2.0"
 
 
 // Print usage information and exit.
 static void usage(const char * progname, int exitcode = 0, const string & error = "")
 {
-	cout << "Usage: " << boost::filesystem::path(progname).filename().native() << " [OPTION...] <input>[.cue/bin] <repl_file_path> <new_file>" << endl;
+	cout << "Usage: " << boost::filesystem::path(progname).filename().native() << " [OPTION...] <input>[.bin/cue] <repl_file_path> <new_file>" << endl;
 	cout << "  -v, --verbose                   Be verbose" << endl;
 	cout << "  -V, --version                   Display version information and exit" << endl;
 	cout << "  -?, --help                      Show this help message" << endl;
