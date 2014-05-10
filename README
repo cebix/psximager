@@ -45,7 +45,7 @@ psxrip
 ------
 
 Usage: psxrip [OPTION...] <input>[.bin/cue] [<output_dir>]
-  -l, --lbn-table                 Write LBNs to catalog file
+  -l, --lbns                      Write LBNs to catalog file
   -t, --lbn-table                 Print LBN table and exit
   -v, --verbose                   Be verbose
   -V, --version                   Display version information and exit
@@ -341,7 +341,7 @@ Together with a corresponding directory tree of files:
 
 a CD image can be built with:
 
-  $ psxbuild MYGAME
+  $ psxbuild -c MYGAME
   Reading catalog file "MYGAME.cat"...
   Reading filesystem from directory "MYGAME"...
   Image file written to "MYGAME.bin"
