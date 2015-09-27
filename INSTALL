@@ -26,3 +26,30 @@ PSXImager can be compiled and installed in the usual way:
 
 Installation is not strictly necessary; the three binaries built in the
 "src" directory are stand-alone programs.
+
+Ubuntu 15.04 Installation
+=========================
+Install autoconf:
+  # apt-get install autoconf build-essential
+
+Install boost dev libraries:
+  # apt-get install libboost-all-dev
+
+Download the following libraries (not available on stable Ubuntu or Debian at the moment), scroll down and click amd64 or i386 depending on your arch, then pick a download link:
+  https://packages.debian.org/experimental/libiso9660-dev
+  https://packages.debian.org/experimental/libiso9660-9
+  https://packages.debian.org/experimental/libcdio-dev
+  https://packages.debian.org/experimental/libcdio15
+
+Install the downloaded packages:
+  # dpkg -i lib{cdio,iso}*.deb
+
+Now configure should work:
+  $ ./configure --with-boost-libdir=/usr/lib/x86_64-linux-gnu
+
+Compile:
+  $ make
+
+Compiled files are under src/:
+  $ ls src/psx{build,inject,rip}
+  src/psxbuild  src/psxinject  src/psxrip
