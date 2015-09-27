@@ -44,6 +44,9 @@ Download the following libraries (not available on stable Ubuntu or Debian at th
 Install the downloaded packages:
   # dpkg -i lib{cdio,iso}*.deb
 
+Install libvcdinfo:
+  # apt-get install libvcdinfo0 libvcdinfo-dev
+
 Now configure should work:
   $ ./configure --with-boost-libdir=/usr/lib/x86_64-linux-gnu
 
