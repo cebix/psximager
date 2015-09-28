@@ -49,6 +49,9 @@ Install libvcdinfo:
 
 Now configure should work:
   $ ./configure --with-boost-libdir=/usr/lib/x86_64-linux-gnu
+  
+If you want a static build (to copy the executables and run on other Linux without worrying about dependencies):
+  $ ./configure --with-boost-libdir=/usr/lib/x86_64-linux-gnu LDFLAGS="-static" LIBS="-lpthread"
 
 Compile:
   $ make
