@@ -107,7 +107,7 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
 	cdio_info("Dumping '%s' as '%s'", inputPath.c_str(), dirName.c_str());
 
 	// Read the directory entries
-	CdioList_t * entries = iso9660_fs_readdir(image, inputPath.c_str(), false);
+	CdioList_t * entries = iso9660_fs_readdir(image, inputPath.c_str());
 	if (!entries) {
 		throw runtime_error((format("Error reading ISO 9660 directory '%1%'") % inputPath).str());
 	}
@@ -227,7 +227,7 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
 	// Close the catalog record for the directory
 	catalog << string(level * 2, ' ') << "}\n";
 
-	_cdio_list_free(entries, true);
+	_cdio_list_free(entries, true, (CdioDataFree_t) iso9660_stat_free);
 }
 
 
@@ -297,7 +297,7 @@ static void dumpImage(CdIo_t * image, const boost::filesystem::path & outputPath
 static void dumpLBNTable(CdIo_t * image, const string & inputPath = "", ostream & output = cout)
 {
 	// Read the directory entries
-	CdioList_t * entries = iso9660_fs_readdir(image, inputPath.c_str(), false);
+	CdioList_t * entries = iso9660_fs_readdir(image, inputPath.c_str());
 	if (!entries) {
 		throw runtime_error((format("Error reading ISO 9660 directory '%1%'") % inputPath).str());
 	}
