@@ -324,7 +324,8 @@ static void checkDString(const string & s, const string & description)
 	for (size_t i = 0; i < s.length(); ++i) {
 		char c = s[i];
 		if (!iso9660_is_dchar(c)) {
-			throw runtime_error((format("Illegal character '%1%' in %2% \"%3%\"") % c % description % s).str());
+			cerr << (format("Warning: Illegal character '%1%' in %2% \"%3%\"") % c % description % s) << endl;
+			break;
 		}
 	}
 }
@@ -336,7 +337,8 @@ static void checkAString(const string & s, const string & description)
 	for (size_t i = 0; i < s.length(); ++i) {
 		char c = s[i];
 		if (!iso9660_is_achar(c)) {
-			throw runtime_error((format("Illegal character '%1%' in %2% \"%3%\"") % c % description % s).str());
+			cerr << (format("Warning: Illegal character '%1%' in %2% \"%3%\"") % c % description % s) << endl;
+			break;
 		}
 	}
 }
