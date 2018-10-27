@@ -6,10 +6,10 @@ A C++ compiler.
 Boost C++ libraries >= 1.50.0
   http://www.boost.org/
 
-libcdio and libiso9660 >= 0.90
+libcdio and libiso9660 >= 2.0.0
   http://www.gnu.org/software/libcdio/
 
-libvcdinfo >= 0.7.27
+libvcdinfo >= 2.0.1
   http://www.gnu.org/software/vcdimager/
 
 
