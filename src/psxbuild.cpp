@@ -825,7 +825,7 @@ public:
 
 	void visit(FileNode & file)
 	{
-		ifstream f(file.path.c_str(), ifstream::in | ifstream::binary);
+		ifstream f(file.path.string().c_str(), ifstream::in | ifstream::binary);
 		if (!f) {
 			throw runtime_error((format("Cannot open file %1%") % file.path).str());
 		}
@@ -940,7 +940,7 @@ static void writeSystemArea(ofstream & image, const Catalog & cat)
 // Print usage information and exit.
 static void usage(const char * progname, int exitcode = 0, const string & error = "")
 {
-	cout << "Usage: " << boost::filesystem::path(progname).filename().native() << " [OPTION...] <input>[.cat] [<output>[.bin]]" << endl;
+	cout << "Usage: " << boost::filesystem::path(progname).filename().string() << " [OPTION...] <input>[.cat] [<output>[.bin]]" << endl;
     cout << "  -c, --cuefile                   Create a .cue file" << endl;
 	cout << "  -v, --verbose                   Be verbose" << endl;
 	cout << "  -V, --version                   Display version information and exit" << endl;
@@ -1008,7 +1008,7 @@ int main(int argc, char ** argv)
 
 		Catalog cat;
 
-		ifstream catalogFile(catalogName.c_str());
+		ifstream catalogFile(catalogName.string().c_str());
 		if (!catalogFile) {
 			throw runtime_error((format("Cannot open catalog file %1%") % catalogName).str());
 		}
@@ -1069,7 +1069,7 @@ int main(int argc, char ** argv)
 		boost::filesystem::path imageName = outputPath;
 		imageName.replace_extension(".bin");
 
-		ofstream image(imageName.c_str(), ofstream::out | ofstream::binary | ofstream::trunc);
+		ofstream image(imageName.string().c_str(), ofstream::out | ofstream::binary | ofstream::trunc);
 		if (!image) {
 			throw runtime_error((format("Error creating image file %1%") % imageName).str());
 		}
@@ -1157,7 +1157,7 @@ int main(int argc, char ** argv)
 			boost::filesystem::path cueName = outputPath;
 			cueName.replace_extension(".cue");
 
-			ofstream cueFile(cueName.c_str(), ofstream::out | ofstream::trunc);
+			ofstream cueFile(cueName.string().c_str(), ofstream::out | ofstream::trunc);
 			if (!cueFile) {
 				throw runtime_error((format("Error creating cue file %1%") % cueName).str());
 			}
