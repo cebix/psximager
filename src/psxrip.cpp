@@ -43,7 +43,7 @@ using boost::format;
 using namespace std;
 
 
-#define TOOL_VERSION "PSXRip 2.0"
+#define TOOL_VERSION "PSXRip 2.1"
 
 
 // Sector buffer

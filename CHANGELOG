@@ -1,3 +1,6 @@
+V2.1 (2024-08-08)
+ - Adapted to libcdio/libiso9660 2.x, which are now the required versions
+
 V2.0 (2014-05-10)
  - The syntax of catalog files has changed slightly:
     - File and directory names are no longer enclosed in [] brackets.

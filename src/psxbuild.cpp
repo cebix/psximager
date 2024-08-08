@@ -49,7 +49,7 @@ using boost::format;
 using namespace std;
 
 
-#define TOOL_VERSION "PSXBuild 2.0"
+#define TOOL_VERSION "PSXBuild 2.1"
 
 
 struct FileNode;
