@@ -31,14 +31,15 @@ extern "C" {
 #include <libvcd/sector.h>
 }
 
-#include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 using boost::format;
 
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
+namespace fs = std::filesystem;
 using namespace std;
 
 
@@ -48,7 +49,7 @@ using namespace std;
 // Print usage information and exit.
 static void usage(const char * progname, int exitcode = 0, const string & error = "")
 {
-	cout << "Usage: " << boost::filesystem::path(progname).filename() << " [OPTION...] <input>[.bin/cue] <repl_file_path> <new_file>" << endl;
+	cout << "Usage: " << fs::path(progname).filename().string() << " [OPTION...] <input>[.bin/cue] <repl_file_path> <new_file>" << endl;
 	cout << "  -v, --verbose                   Be verbose" << endl;
 	cout << "  -V, --version                   Display version information and exit" << endl;
 	cout << "  -?, --help                      Show this help message" << endl;
@@ -65,9 +66,9 @@ static void usage(const char * progname, int exitcode = 0, const string & error 
 int main(int argc, char ** argv)
 {
 	// Parse command line arguments
-	boost::filesystem::path imagePath;
+	fs::path imagePath;
 	string replFilePath;
-	boost::filesystem::path newFileName;
+	fs::path newFileName;
 
 	for (int i = 1; i < argc; ++i) {
 		string arg = argv[i];
@@ -155,7 +156,7 @@ int main(int argc, char ** argv)
 		cdio_info("'%s' (form %d) found at LBN %d, length = %d sectors (%d bytes)", replFilePath.c_str(), fileIsForm2 ? 2 : 1, extent, maxSectors, stat->size);
 
 		// Check the new file
-		uintmax_t newSize = boost::filesystem::file_size(newFileName);
+		uintmax_t newSize = fs::file_size(newFileName);
 		size_t blockSize = fileIsForm2 ? M2RAW_SECTOR_SIZE : ISO_BLOCKSIZE;
 
 		if (fileIsForm2) {
@@ -181,7 +182,7 @@ int main(int argc, char ** argv)
 		}
 
 		// Find the directory in the image
-		string dirPath = boost::filesystem::path(replFilePath).parent_path().generic_string();
+		string dirPath = fs::path(replFilePath).parent_path().generic_string();
 		if (dirPath.empty()) {
 			dirPath = "/";
 		}
@@ -200,7 +201,7 @@ int main(int argc, char ** argv)
 		size_t dirOffset = 0;
 		bool isLastDirSector = false;
 
-		string searchName = boost::filesystem::path(replFilePath).filename().generic_string() + ";1";
+		string searchName = fs::path(replFilePath).filename().generic_string() + ";1";
 		bool found = false;
 
 		uint8_t dirBuffer[ISO_BLOCKSIZE];

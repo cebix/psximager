@@ -32,13 +32,13 @@ extern "C" {
 #include <time.h>
 
 #include <boost/algorithm/string/trim.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 using boost::format;
 
 #include <algorithm>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -46,8 +46,8 @@ using boost::format;
 #include <regex>
 #include <string>
 #include <vector>
+namespace fs = std::filesystem;
 using namespace std;
-
 
 #define TOOL_VERSION "PSXBuild 2.1"
 
@@ -128,7 +128,7 @@ public:
 
 // Base class for filesystem node
 struct FSNode {
-	FSNode(const string & name_, const boost::filesystem::path & path_, DirNode * parent_, uint32_t startSector_ = 0)
+	FSNode(const string & name_, const fs::path & path_, DirNode * parent_, uint32_t startSector_ = 0)
 		: parent(parent_), name(name_), path(path_), firstSector(0), numSectors(0), requestedStartSector(startSector_) { }
 
 	virtual ~FSNode() { }
@@ -146,7 +146,7 @@ struct FSNode {
 	string name;
 
 	// Path to item in host filesystem
-	boost::filesystem::path path;
+	fs::path path;
 
 	// First logical sector number
 	uint32_t firstSector;
@@ -182,11 +182,11 @@ struct CmpByName {
 
 // File (leaf) node
 struct FileNode : public FSNode {
-	FileNode(const string & name_, const boost::filesystem::path & path_, DirNode * parent_, uint32_t startSector_ = 0, bool isForm2_ = false)
+	FileNode(const string & name_, const fs::path & path_, DirNode * parent_, uint32_t startSector_ = 0, bool isForm2_ = false)
 		: FSNode(name_, path_, parent_, startSector_), isForm2(isForm2_)
 	{
 		// Check for the existence of the file and obtain its size
-		size = boost::filesystem::file_size(path);
+		size = fs::file_size(path);
 
 		// Calculate the number of sectors in the file extent
 		size_t blockSize = isForm2 ? M2RAW_SECTOR_SIZE : ISO_BLOCKSIZE;
@@ -209,7 +209,7 @@ struct FileNode : public FSNode {
 
 // Directory node
 struct DirNode : public FSNode {
-	DirNode(const string & name_, const boost::filesystem::path & path_, DirNode * parent_ = NULL, uint32_t startSector_ = 0)
+	DirNode(const string & name_, const fs::path & path_, DirNode * parent_ = NULL, uint32_t startSector_ = 0)
 		: FSNode(name_, path_, parent_, startSector_), data(NULL), recordNumber(0) { }
 
 	// Pointer to directory extent data
@@ -535,7 +535,7 @@ static void parseVolume(ifstream & catalogFile, Catalog & cat)
 
 
 // Recursively parse a "dir" section of the catalog file.
-static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & dirName, const boost::filesystem::path & path, DirNode * parent = NULL, uint32_t startSector = 0)
+static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & dirName, const fs::path & path, DirNode * parent = NULL, uint32_t startSector = 0)
 {
 	DirNode * dir = new DirNode(dirName, path, parent, startSector);
 
@@ -602,7 +602,7 @@ static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & 
 
 
 // Parse the catalog file and fill in the Catalog structure.
-static void parseCatalog(ifstream & catalogFile, Catalog & cat, const boost::filesystem::path & fsBase)
+static void parseCatalog(ifstream & catalogFile, Catalog & cat, const fs::path & fsBase)
 {
 	while (true) {
 		string line = nextline(catalogFile);
@@ -940,7 +940,7 @@ static void writeSystemArea(ofstream & image, const Catalog & cat)
 // Print usage information and exit.
 static void usage(const char * progname, int exitcode = 0, const string & error = "")
 {
-	cout << "Usage: " << boost::filesystem::path(progname).filename() << " [OPTION...] <input>[.cat] [<output>[.bin]]" << endl;
+	cout << "Usage: " << fs::path(progname).filename().string() << " [OPTION...] <input>[.cat] [<output>[.bin]]" << endl;
     cout << "  -c, --cuefile                   Create a .cue file" << endl;
 	cout << "  -v, --verbose                   Be verbose" << endl;
 	cout << "  -V, --version                   Display version information and exit" << endl;
@@ -958,8 +958,8 @@ static void usage(const char * progname, int exitcode = 0, const string & error 
 int main(int argc, char ** argv)
 {
 	// Parse command line arguments
-	boost::filesystem::path inputPath;
-	boost::filesystem::path outputPath;
+	fs::path inputPath;
+	fs::path outputPath;
 	bool verbose = false;
 	bool writeCueFile = false;
 
@@ -1001,7 +1001,7 @@ int main(int argc, char ** argv)
 	try {
 
 		// Read and parse the catalog file
-		boost::filesystem::path catalogName = inputPath;
+		fs::path catalogName = inputPath;
 		if (catalogName.extension().empty()) {
 			catalogName.replace_extension(".cat");
 		}
@@ -1013,7 +1013,7 @@ int main(int argc, char ** argv)
 			throw runtime_error((format("Cannot open catalog file %1%") % catalogName).str());
 		}
 
-		boost::filesystem::path fsBasePath = inputPath;
+		fs::path fsBasePath = inputPath;
 		fsBasePath.replace_extension("");
 
 		cout << "Reading catalog file " << catalogName << "...\n";
@@ -1066,7 +1066,7 @@ int main(int argc, char ** argv)
 		}
 
 		// Create the image file
-		boost::filesystem::path imageName = outputPath;
+		fs::path imageName = outputPath;
 		imageName.replace_extension(".bin");
 
 		ofstream image(imageName, ofstream::out | ofstream::binary | ofstream::trunc);
@@ -1154,7 +1154,7 @@ int main(int argc, char ** argv)
 
 		// Write the cue file
 		if (writeCueFile) {
-			boost::filesystem::path cueName = outputPath;
+			fs::path cueName = outputPath;
 			cueName.replace_extension(".cue");
 
 			ofstream cueFile(cueName, ofstream::out | ofstream::trunc);

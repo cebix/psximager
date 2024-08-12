@@ -31,15 +31,16 @@ extern "C" {
 #include <libvcd/sector.h>
 }
 
-#include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 using boost::format;
 
 #include <algorithm>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
+namespace fs = std::filesystem;
 using namespace std;
 
 
@@ -61,7 +62,7 @@ static void print_ltime(ofstream & f, const iso9660_ltime_t & l)
 
 
 // Dump system area data from image to file.
-static void dumpSystemArea(CdIo_t * image, const boost::filesystem::path & fileName)
+static void dumpSystemArea(CdIo_t * image, const fs::path & fileName)
 {
 	ofstream file(fileName, ofstream::out | ofstream::binary | ofstream::trunc);
 	if (!file) {
@@ -101,7 +102,7 @@ struct CmpByLSN {
 // Recursively dump the contents of the ISO filesystem starting at 'dir'
 // while extending the catalog file.
 static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
-						   const boost::filesystem::path & outputPath, const string & inputPath = "",
+						   const fs::path & outputPath, const string & inputPath = "",
 						   const string & dirName = "", unsigned level = 0)
 {
 	cdio_info("Dumping '%s' as '%s'", inputPath.c_str(), dirName.c_str());
@@ -113,8 +114,8 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
 	}
 
 	// Create the output directory
-	boost::filesystem::path outputDirName = outputPath / dirName;
-	boost::filesystem::create_directory(outputDirName);
+	fs::path outputDirName = outputPath / dirName;
+	fs::create_directory(outputDirName);
 
 	// Open the catalog record for the directory
 	if (level == 0) {
@@ -189,7 +190,7 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
 			catalog << "\n";
 
 			// Dump the file contents
-			boost::filesystem::path outputFileName = outputDirName / entryName;
+			fs::path outputFileName = outputDirName / entryName;
 			ofstream file(outputFileName, ofstream::out | ofstream::binary | ofstream::trunc);
 			if (!file) {
 				throw runtime_error((format("Cannot create output file %1%") % outputFileName).str());
@@ -232,7 +233,7 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
 
 
 // Dump image to system area data, catalog file, and output directory.
-static void dumpImage(CdIo_t * image, const boost::filesystem::path & outputPath, bool writeLBNs)
+static void dumpImage(CdIo_t * image, const fs::path & outputPath, bool writeLBNs)
 {
 	// Read ISO volume information
 	iso9660_pvd_t pvd;
@@ -242,10 +243,10 @@ static void dumpImage(CdIo_t * image, const boost::filesystem::path & outputPath
 	cout << "Volume ID = " << iso9660_get_volume_id(&pvd) << endl;
 
 	// Construct names of output files
-	boost::filesystem::path catalogName = outputPath;
+	fs::path catalogName = outputPath;
 	catalogName.replace_extension(".cat");
 
-	boost::filesystem::path systemAreaName = outputPath;
+	fs::path systemAreaName = outputPath;
 	systemAreaName.replace_extension(".sys");
 
 	// Create output catalog file
@@ -366,7 +367,7 @@ static void dumpLBNTable(CdIo_t * image, const string & inputPath = "", ostream 
 // Print usage information and exit.
 static void usage(const char * progname, int exitcode = 0, const string & error = "")
 {
-	cout << "Usage: " << boost::filesystem::path(progname).filename() << " [OPTION...] <input>[.bin/cue] [<output_dir>]" << endl;
+	cout << "Usage: " << fs::path(progname).filename().string() << " [OPTION...] <input>[.bin/cue] [<output_dir>]" << endl;
 	cout << "  -l, --lbns                      Write LBNs to catalog file" << endl;
 	cout << "  -t, --lbn-table                 Print LBN table and exit" << endl;
 	cout << "  -v, --verbose                   Be verbose" << endl;
@@ -385,8 +386,8 @@ static void usage(const char * progname, int exitcode = 0, const string & error 
 int main(int argc, const char ** argv)
 {
 	// Parse command line arguments
-	boost::filesystem::path inputPath;
-	boost::filesystem::path outputPath;
+	fs::path inputPath;
+	fs::path outputPath;
 	bool writeLBNs = false;
 	bool printLBNTable = false;
 
