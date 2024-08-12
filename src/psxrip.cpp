@@ -1,7 +1,7 @@
 //
 // PSXRip - Disassemble a PlayStation 1 disc image into its contents
 //
-// Copyright (C) 2014 Christian Bauer <www.cebix.net>
+// Copyright (C) Christian Bauer <www.cebix.net>
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
