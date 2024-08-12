@@ -35,7 +35,6 @@ extern "C" {
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/regex.hpp>
 using boost::format;
 
 #include <algorithm>
@@ -44,6 +43,7 @@ using boost::format;
 #include <iostream>
 #include <memory>
 #include <queue>
+#include <regex>
 #include <string>
 #include <vector>
 using namespace std;
@@ -69,10 +69,10 @@ const uint32_t MAX_ISO_SECTORS = 74 * 60 * 75;  // 74 minutes
 // Create an ISO long-format time structure from an ISO8601-like string
 static void parse_ltime(const string & s, iso9660_ltime_t & t)
 {
-	static const boost::regex timeSpec("(\\d{4})-(\\d{2})-(\\d{2})\\s+(\\d{2}):(\\d{2}):(\\d{2})\\.(\\d{2})\\s+(\\d+)");
-	boost::smatch m;
+	static const regex timeSpec("(\\d{4})-(\\d{2})-(\\d{2})\\s+(\\d{2}):(\\d{2}):(\\d{2})\\.(\\d{2})\\s+(\\d+)");
+	smatch m;
 
-	if (!boost::regex_match(s, m, timeSpec)) {
+	if (! regex_match(s, m, timeSpec)) {
 		throw runtime_error((format("'%1%' is not a valid date/time specification") % s).str());
 	}
 
@@ -384,15 +384,15 @@ static void parseSystemArea(ifstream & catalogFile, Catalog & cat)
 			throw runtime_error("Syntax error in catalog file: unterminated system_area section");
 		}
 
-		static const boost::regex fileSpec("file\\s*\"(.+)\"");
-		boost::smatch m;
+		static const regex fileSpec("file\\s*\"(.+)\"");
+		smatch m;
 
 		if (line == "}") {
 
 			// End of section
 			break;
 
-		} else if (boost::regex_match(line, m, fileSpec)) {
+		} else if (regex_match(line, m, fileSpec)) {
 
 			// File specification
 			cat.systemAreaFile = m[1];
@@ -413,103 +413,103 @@ static void parseVolume(ifstream & catalogFile, Catalog & cat)
 			throw runtime_error("Syntax error in catalog file: unterminated volume section");
 		}
 
-		static const boost::regex systemIdSpec("system_id\\s*\\[(.*)\\]");
-		static const boost::regex volumeIdSpec("volume_id\\s*\\[(.*)\\]");
-		static const boost::regex volumeSetIdSpec("volume_set_id\\s*\\[(.*)\\]");
-		static const boost::regex publisherIdSpec("publisher_id\\s*\\[(.*)\\]");
-		static const boost::regex preparerIdSpec("preparer_id\\s*\\[(.*)\\]");
-		static const boost::regex applicationIdSpec("application_id\\s*\\[(.*)\\]");
-		static const boost::regex copyrightFileIdSpec("copyright_file_id\\s*\\[(.*)\\]");
-		static const boost::regex abstractFileIdSpec("abstract_file_id\\s*\\[(.*)\\]");
-		static const boost::regex bibliographicFileIdSpec("bibliographic_file_id\\s*\\[(.*)\\]");
-		static const boost::regex creationDateSpec("creation_date\\s*(.*)");
-		static const boost::regex modificationDateSpec("modification_date\\s*(.*)");
-		static const boost::regex expirationDateSpec("expiration_date\\s*(.*)");
-		static const boost::regex effectiveDateSpec("effective_date\\s*(.*)");
-		static const boost::regex defaultUIDSpec("default_uid\\s*(\\d+)");
-		static const boost::regex defaultGIDSpec("default_gid\\s*(\\d+)");
-		boost::smatch m;
+		static const regex systemIdSpec("system_id\\s*\\[(.*)\\]");
+		static const regex volumeIdSpec("volume_id\\s*\\[(.*)\\]");
+		static const regex volumeSetIdSpec("volume_set_id\\s*\\[(.*)\\]");
+		static const regex publisherIdSpec("publisher_id\\s*\\[(.*)\\]");
+		static const regex preparerIdSpec("preparer_id\\s*\\[(.*)\\]");
+		static const regex applicationIdSpec("application_id\\s*\\[(.*)\\]");
+		static const regex copyrightFileIdSpec("copyright_file_id\\s*\\[(.*)\\]");
+		static const regex abstractFileIdSpec("abstract_file_id\\s*\\[(.*)\\]");
+		static const regex bibliographicFileIdSpec("bibliographic_file_id\\s*\\[(.*)\\]");
+		static const regex creationDateSpec("creation_date\\s*(.*)");
+		static const regex modificationDateSpec("modification_date\\s*(.*)");
+		static const regex expirationDateSpec("expiration_date\\s*(.*)");
+		static const regex effectiveDateSpec("effective_date\\s*(.*)");
+		static const regex defaultUIDSpec("default_uid\\s*(\\d+)");
+		static const regex defaultGIDSpec("default_gid\\s*(\\d+)");
+		smatch m;
 
 		if (line == "}") {
 
 			// End of section
 			break;
 
-		} else if (boost::regex_match(line, m, systemIdSpec)) {
+		} else if (regex_match(line, m, systemIdSpec)) {
 
 			// System ID specification
 			checkAString(m[1], "system_id");
 			cat.systemID = m[1];
 
-		} else if (boost::regex_match(line, m, volumeIdSpec)) {
+		} else if (regex_match(line, m, volumeIdSpec)) {
 
 			// Volume ID specification
 			checkDString(m[1], "volume_id");
 			cat.volumeID = m[1];
 
-		} else if (boost::regex_match(line, m, volumeSetIdSpec)) {
+		} else if (regex_match(line, m, volumeSetIdSpec)) {
 
 			// Volume set ID specification
 			checkDString(m[1], "volume_set_id");
 			cat.volumeSetID = m[1];
 
-		} else if (boost::regex_match(line, m, publisherIdSpec)) {
+		} else if (regex_match(line, m, publisherIdSpec)) {
 
 			// Publisher ID specification
 			checkAString(m[1], "publisher_id");
 			cat.publisherID = m[1];
 
-		} else if (boost::regex_match(line, m, preparerIdSpec)) {
+		} else if (regex_match(line, m, preparerIdSpec)) {
 
 			// Preparer ID specification
 			checkAString(m[1], "preparer_id");
 			cat.preparerID = m[1];
 
-		} else if (boost::regex_match(line, m, applicationIdSpec)) {
+		} else if (regex_match(line, m, applicationIdSpec)) {
 
 			// Application ID specification
 			checkAString(m[1], "application_id");
 			cat.applicationID = m[1];
 
-		} else if (boost::regex_match(line, m, copyrightFileIdSpec)) {
+		} else if (regex_match(line, m, copyrightFileIdSpec)) {
 
 			// Copyright file ID specification
 			checkDString(m[1], "copyright_file_id");
 			cat.copyrightFileID = m[1];
 
-		} else if (boost::regex_match(line, m, abstractFileIdSpec)) {
+		} else if (regex_match(line, m, abstractFileIdSpec)) {
 
 			// Abstract file ID specification
 			checkDString(m[1], "abstract_file_id");
 			cat.abstractFileID = m[1];
 
-		} else if (boost::regex_match(line, m, bibliographicFileIdSpec)) {
+		} else if (regex_match(line, m, bibliographicFileIdSpec)) {
 
 			// Bibliographic file ID specification
 			checkDString(m[1], "bibliographic_file_id");
 			cat.bibliographicFileID = m[1];
 
-		} else if (boost::regex_match(line, m, creationDateSpec)) {
+		} else if (regex_match(line, m, creationDateSpec)) {
 
 			// Creation date specification
 			parse_ltime(m[1], cat.creationDate);
 
-		} else if (boost::regex_match(line, m, modificationDateSpec)) {
+		} else if (regex_match(line, m, modificationDateSpec)) {
 
 			// Modification date specification
 			parse_ltime(m[1], cat.modificationDate);
 
-		} else if (boost::regex_match(line, m, expirationDateSpec)) {
+		} else if (regex_match(line, m, expirationDateSpec)) {
 
 			// Expiration date specification
 			parse_ltime(m[1], cat.expirationDate);
 
-		} else if (boost::regex_match(line, m, effectiveDateSpec)) {
+		} else if (regex_match(line, m, effectiveDateSpec)) {
 
 			// Effective date specification
 			parse_ltime(m[1], cat.effectiveDate);
 
-		} else if (boost::regex_match(line, m, defaultUIDSpec)) {
+		} else if (regex_match(line, m, defaultUIDSpec)) {
 
 			// Default user ID specification
 			try {
@@ -518,7 +518,7 @@ static void parseVolume(ifstream & catalogFile, Catalog & cat)
 				throw runtime_error((format("'%1%' is not a valid user ID") % m[1]).str());
 			}
 
-		} else if (boost::regex_match(line, m, defaultGIDSpec)) {
+		} else if (regex_match(line, m, defaultGIDSpec)) {
 
 			// Default group ID specification
 			try {
@@ -545,17 +545,17 @@ static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & 
 			throw runtime_error((format("Syntax error in catalog file: unterminated directory section \"%1%\"") % dirName).str());
 		}
 
-		static const boost::regex fileSpec("file\\s*(\\S+)(?:\\s*@(\\d+))?");
-		static const boost::regex xaFileSpec("xafile\\s*(\\S+)(?:\\s*@(\\d+))?");
-		static const boost::regex dirStart("dir\\s*(\\S+)(?:\\s*@(\\d+))?\\s*\\{");
-		boost::smatch m;
+		static const regex fileSpec("file\\s*(\\S+)(?:\\s*@(\\d+))?");
+		static const regex xaFileSpec("xafile\\s*(\\S+)(?:\\s*@(\\d+))?");
+		static const regex dirStart("dir\\s*(\\S+)(?:\\s*@(\\d+))?\\s*\\{");
+		smatch m;
 
 		if (line == "}") {
 
 			// End of section
 			break;
 
-		} else if (boost::regex_match(line, m, fileSpec)) {
+		} else if (regex_match(line, m, fileSpec)) {
 
 			// File specification
 			string fileName = m[1];
@@ -566,7 +566,7 @@ static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & 
 			FileNode * file = new FileNode(fileName + ";1", path / fileName, dir, startSector);
 			dir->children.push_back(file);
 
-		} else if (boost::regex_match(line, m, xaFileSpec)) {
+		} else if (regex_match(line, m, xaFileSpec)) {
 
 			// XA file specification
 			string fileName = m[1];
@@ -577,7 +577,7 @@ static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & 
 			FileNode * file = new FileNode(fileName + ";1", path / fileName, dir, startSector, true);
 			dir->children.push_back(file);
 
-		} else if (boost::regex_match(line, m, dirStart)) {
+		} else if (regex_match(line, m, dirStart)) {
 
 			// Subdirectory section
 			string subDirName = m[1];
@@ -612,21 +612,21 @@ static void parseCatalog(ifstream & catalogFile, Catalog & cat, const boost::fil
 			return;
 		}
 
-		static const boost::regex systemAreaStart("system_area\\s*\\{");
-		static const boost::regex volumeStart("volume\\s*\\{");
-		static const boost::regex rootDirStart("dir\\s*\\{");
+		static const regex systemAreaStart("system_area\\s*\\{");
+		static const regex volumeStart("volume\\s*\\{");
+		static const regex rootDirStart("dir\\s*\\{");
 
-		if (boost::regex_match(line, systemAreaStart)) {
+		if (regex_match(line, systemAreaStart)) {
 
 			// Parse system_area section
 			parseSystemArea(catalogFile, cat);
 
-		} else if (boost::regex_match(line, volumeStart)) {
+		} else if (regex_match(line, volumeStart)) {
 
 			// Parse volume section
 			parseVolume(catalogFile, cat);
 
-		} else if (boost::regex_match(line, rootDirStart)) {
+		} else if (regex_match(line, rootDirStart)) {
 
 			// Parse root directory entry
 			if (cat.root) {

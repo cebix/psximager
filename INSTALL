@@ -1,7 +1,7 @@
 Prerequisites
 =============
 
-A C++ compiler.
+A C++11 compiler.
 
 Boost C++ libraries >= 1.50.0
   http://www.boost.org/
