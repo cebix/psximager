@@ -5,6 +5,7 @@ AC_CONFIG_SRCDIR([src/psxrip.cpp])
 AM_INIT_AUTOMAKE([1.12 foreign])
 
 AC_PROG_CXX
+AX_CXX_COMPILE_STDCXX(20, noext, mandatory)
 
 PKG_CHECK_MODULES(LIBCDIO, libcdio >= 2.0.0)
 PKG_CHECK_MODULES(LIBISO9660, libiso9660 >= 2.0.0)

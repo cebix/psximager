@@ -18,7 +18,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
 //
 
-#include <stdint.h>
+#include <string.h>  // memset()
 
 #include <cdio/cdio.h>
 #include <cdio/cd_types.h>
@@ -31,11 +31,10 @@ extern "C" {
 #include <libvcd/sector.h>
 }
 
-#include <boost/format.hpp>
-using boost::format;
-
+#include <cstdint>
 #include <exception>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -112,7 +111,7 @@ int main(int argc, char ** argv)
 
 		CdIo_t * image = cdio_open(imagePath.string().c_str(), DRIVER_BINCUE);
 		if (image == NULL) {
-			throw runtime_error((format("Error opening input image %1%, or image has wrong type") % imagePath).str());
+			throw runtime_error(format("Error opening input image {}, or image has wrong type", imagePath.string()));
 		}
 
 		// Check the track type
@@ -125,7 +124,7 @@ int main(int argc, char ** argv)
 		track_format_t trackFormat = cdio_get_track_format(image, firstTrack);
 		cdio_info("Track format = %d", trackFormat);
 		if (trackFormat != TRACK_FORMAT_DATA && trackFormat != TRACK_FORMAT_XA) {
-			throw runtime_error((format("First track (%1%) is not a data track") % firstTrack).str());
+			throw runtime_error(format("First track ({}) is not a data track", firstTrack));
 		}
 
 		bool imageIsMode2 = (trackFormat == TRACK_FORMAT_XA);
@@ -137,10 +136,10 @@ int main(int argc, char ** argv)
 
 		iso9660_stat_t * stat = iso9660_fs_stat(image, (replFilePath + ";1").c_str());
 		if (!stat) {
-			throw runtime_error((format("Cannot find '%1%' in image") % replFilePath).str());
+			throw runtime_error(format("Cannot find '{}' in image", replFilePath));
 		}
 		if (stat->type != iso9660_stat_s::_STAT_FILE) {
-			throw runtime_error((format("'%1%' does not refer to a file") % replFilePath).str());
+			throw runtime_error(format("'{}' does not refer to a file", replFilePath));
 		}
 
 		bool fileIsForm2 = false;
@@ -161,13 +160,13 @@ int main(int argc, char ** argv)
 
 		if (fileIsForm2) {
 			if (!imageIsMode2) {
-				throw runtime_error((format("'%1%' is a form 2 file but '%2%' is not a raw mode 2 image")
-				                     % replFilePath % imagePath).str());
+				throw runtime_error(format("'{}' is a form 2 file but '{}' is not a raw mode 2 image",
+				                    replFilePath, imagePath.string()));
 			}
 
 			if (newSize % blockSize != 0) {
-				throw runtime_error((format("'%1%' is a form 2 file but the size of %2% is not a multiple of %3% bytes")
-				                     % replFilePath % newFileName % blockSize).str());
+				throw runtime_error(format("'{}' is a form 2 file but the size of {} is not a multiple of {} bytes",
+				                    replFilePath, newFileName.string(), blockSize));
 			}
 		}
 
@@ -177,8 +176,8 @@ int main(int argc, char ** argv)
 		}
 
 		if (numSectors > maxSectors) {
-			throw runtime_error((format("%1% would require %2% sectors but there is only room for %3% sectors (%4% bytes)")
-			                     % newFileName % numSectors % maxSectors % (maxSectors * blockSize)).str());
+			throw runtime_error(format("{} would require {} sectors but there is only room for {} sectors ({} bytes)",
+			                    newFileName.string(), numSectors, maxSectors, maxSectors * blockSize));
 		}
 
 		// Find the directory in the image
@@ -189,10 +188,10 @@ int main(int argc, char ** argv)
 
 		iso9660_stat_t * dirStat = iso9660_fs_stat(image, dirPath.c_str());
 		if (!dirStat) {
-			throw runtime_error((format("Cannot find '%1%' in image") % dirPath).str());
+			throw runtime_error(format("Cannot find '{}' in image", dirPath));
 		}
 		if (dirStat->type != iso9660_stat_s::_STAT_DIR) {
-			throw runtime_error((format("'%1%' does not refer to a directory") % dirPath).str());
+			throw runtime_error(format("'{}' does not refer to a directory", dirPath));
 		}
 
 		// Scan the directory for the file record
@@ -213,7 +212,8 @@ int main(int argc, char ** argv)
 
 			driver_return_code_t r = cdio_read_data_sectors(image, dirBuffer, dirSector + sector, ISO_BLOCKSIZE, 1);
 			if (r != DRIVER_OP_SUCCESS) {
-				throw runtime_error((format("Error reading sector %1% of image file: %2%") % (dirSector + sector) % cdio_driver_errmsg(r)).str());
+				throw runtime_error(format("Error reading sector {} of image file: {}",
+				                    (dirSector + sector), cdio_driver_errmsg(r)));
 			}
 
 			size_t offset = 0;
@@ -249,7 +249,7 @@ int main(int argc, char ** argv)
 		}
 
 		if (!found) {
-			throw runtime_error((format("'%1%' not found in directory '%2%'") % searchName % dirPath).str());
+			throw runtime_error(format("'{}' not found in directory '{}'", searchName, dirPath));
 		}
 
 		// Reopen the image file for writing
@@ -261,7 +261,7 @@ int main(int argc, char ** argv)
 		// Read the new file and inject it
 		ifstream file(newFileName, ifstream::in | ifstream::binary);
 		if (!file) {
-			throw runtime_error((format("Cannot open file %1%") % newFileName).str());
+			throw runtime_error(format("Cannot open file {}", newFileName.string()));
 		}
 
 		char data[M2RAW_SECTOR_SIZE];

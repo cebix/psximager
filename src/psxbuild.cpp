@@ -18,7 +18,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
 //
 
-#include <stdint.h>
+#include <string.h>  // memset()
 
 #include <cdio/cdio.h>
 #include <cdio/iso9660.h>
@@ -32,13 +32,13 @@ extern "C" {
 #include <time.h>
 
 #include <boost/algorithm/string/trim.hpp>
-#include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
-using boost::format;
 
 #include <algorithm>
+#include <cstdint>
 #include <exception>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -73,7 +73,7 @@ static void parse_ltime(const string & s, iso9660_ltime_t & t)
 	smatch m;
 
 	if (! regex_match(s, m, timeSpec)) {
-		throw runtime_error((format("'%1%' is not a valid date/time specification") % s).str());
+		throw runtime_error(format("'{}' is not a valid date/time specification", s));
 	}
 
 	t.lt_year[0] = m.str(1)[0];
@@ -102,7 +102,7 @@ static void parse_ltime(const string & s, iso9660_ltime_t & t)
 	try {
 		t.lt_gmtoff = boost::lexical_cast<int>(m[8]);
 	} catch (const boost::bad_lexical_cast &) {
-		throw runtime_error((format("'%1%' is not a valid GMT offset specification") % m[8]).str());
+		throw runtime_error(format("'{}' is not a valid GMT offset specification", m[8].str()));
 	}
 }
 
@@ -324,7 +324,7 @@ static void checkDString(const string & s, const string & description)
 	for (size_t i = 0; i < s.length(); ++i) {
 		char c = s[i];
 		if (!iso9660_is_dchar(c)) {
-			cerr << (format("Warning: Illegal character '%1%' in %2% \"%3%\"") % c % description % s) << endl;
+			cerr << format("Warning: Illegal character '{}' in {} \"{}\"", c, description, s) << endl;
 			break;
 		}
 	}
@@ -337,7 +337,7 @@ static void checkAString(const string & s, const string & description)
 	for (size_t i = 0; i < s.length(); ++i) {
 		char c = s[i];
 		if (!iso9660_is_achar(c)) {
-			cerr << (format("Warning: Illegal character '%1%' in %2% \"%3%\"") % c % description % s) << endl;
+			cerr << format("Warning: Illegal character '{}' in {} \"{}\"", c, description, s) << endl;
 			break;
 		}
 	}
@@ -350,7 +350,7 @@ static void checkFileName(const string & s, const string & description)
 	for (size_t i = 0; i < s.length(); ++i) {
 		char c = s[i];
 		if (!iso9660_is_dchar(c) && c != '.') {
-			throw runtime_error((format("Illegal character '%1%' in %2% \"%3%\"") % c % description % s).str());
+			throw runtime_error(format("Illegal character '{}' in {} \"{}\"", c, description, s));
 		}
 	}
 }
@@ -365,10 +365,10 @@ static uint32_t checkLBN(const string & s, const string & itemName)
 		try {
 			lbn = boost::lexical_cast<uint32_t>(s);
 			if (lbn <= ISO_EVD_SECTOR || lbn >= MAX_ISO_SECTORS) {
-				throw runtime_error((format("Start LBN '%1%' of '%2%' is outside the valid range %3%..%4%") % s % itemName % ISO_EVD_SECTOR % MAX_ISO_SECTORS).str());
+				throw runtime_error(format("Start LBN '{}' of '{}' is outside the valid range {}..{}", s, itemName, (unsigned) ISO_EVD_SECTOR, MAX_ISO_SECTORS));
 			}
 		} catch (const boost::bad_lexical_cast &) {
-			throw runtime_error((format("Invalid start LBN '%1%' specified for '%2%'") % s % itemName).str());
+			throw runtime_error(format("Invalid start LBN '{}' specified for '{}'", s, itemName));
 		}
 	}
 	return lbn;
@@ -398,7 +398,7 @@ static void parseSystemArea(ifstream & catalogFile, Catalog & cat)
 			cat.systemAreaFile = m[1];
 
 		} else {
-			throw runtime_error((format("Syntax error in catalog file: \"%1%\" unrecognized in system_area section") % line).str());
+			throw runtime_error(format("Syntax error in catalog file: \"{}\" unrecognized in system_area section", line));
 		}
 	}
 }
@@ -515,7 +515,7 @@ static void parseVolume(ifstream & catalogFile, Catalog & cat)
 			try {
 				cat.defaultUID = boost::lexical_cast<uint16_t>(m[1]);
 			} catch (boost::bad_lexical_cast &) {
-				throw runtime_error((format("'%1%' is not a valid user ID") % m[1]).str());
+				throw runtime_error(format("'{}' is not a valid user ID", m[1].str()));
 			}
 
 		} else if (regex_match(line, m, defaultGIDSpec)) {
@@ -524,11 +524,11 @@ static void parseVolume(ifstream & catalogFile, Catalog & cat)
 			try {
 				cat.defaultGID = boost::lexical_cast<uint16_t>(m[1]);
 			} catch (boost::bad_lexical_cast &) {
-				throw runtime_error((format("'%1%' is not a valid group ID") % m[1]).str());
+				throw runtime_error(format("'{}' is not a valid group ID", m[1].str()));
 			}
 
 		} else {
-			throw runtime_error((format("Syntax error in catalog file: \"%1%\" unrecognized in volume section") % line).str());
+			throw runtime_error(format("Syntax error in catalog file: \"{}\" unrecognized in volume section", line));
 		}
 	}
 }
@@ -542,7 +542,7 @@ static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & 
 	while (true) {
 		string line = nextline(catalogFile);
 		if (line.empty()) {
-			throw runtime_error((format("Syntax error in catalog file: unterminated directory section \"%1%\"") % dirName).str());
+			throw runtime_error(format("Syntax error in catalog file: unterminated directory section \"{}\"", dirName));
 		}
 
 		static const regex fileSpec("file\\s*(\\S+)(?:\\s*@(\\d+))?");
@@ -589,7 +589,7 @@ static DirNode * parseDir(ifstream & catalogFile, Catalog & cat, const string & 
 			dir->children.push_back(subDir);
 
 		} else {
-			throw runtime_error((format("Syntax error in catalog file: \"%1%\" unrecognized in directory section") % line).str());
+			throw runtime_error(format("Syntax error in catalog file: \"{}\" unrecognized in directory section", line));
 		}
 	}
 
@@ -636,7 +636,7 @@ static void parseCatalog(ifstream & catalogFile, Catalog & cat, const fs::path &
 			}
 
 		} else {
-			throw runtime_error((format("Syntax error in catalog file: \"%1%\" unrecognized") % line).str());
+			throw runtime_error(format("Syntax error in catalog file: \"{}\" unrecognized", line));
 		}
 	}
 }
@@ -827,7 +827,7 @@ public:
 	{
 		ifstream f(file.path, ifstream::in | ifstream::binary);
 		if (!f) {
-			throw runtime_error((format("Cannot open file %1%") % file.path).str());
+			throw runtime_error(format("Cannot open file {}", file.path.string()));
 		}
 
 		cdio_info("Writing \"%s\"...", file.path.c_str());
@@ -909,12 +909,12 @@ static void writeSystemArea(ofstream & image, const Catalog & cat)
 		// Copy the data (max. 32K) from the system area file
 		ifstream f(cat.systemAreaFile.c_str(), ifstream::in | ifstream::binary);
 		if (!f) {
-			throw runtime_error((format("Cannot open system area file \"%1%\"") % cat.systemAreaFile).str());
+			throw runtime_error(format("Cannot open system area file \"{}\"", cat.systemAreaFile));
 		}
 
 		fileSize = f.read(data.get(), systemAreaSize).gcount();
 		if (f.bad()) {
-			throw runtime_error((format("Error reading system area file \"%1%\"") % cat.systemAreaFile).str());
+			throw runtime_error(format("Error reading system area file \"{}\"", cat.systemAreaFile));
 		}
 	}
 
@@ -1010,7 +1010,7 @@ int main(int argc, char ** argv)
 
 		ifstream catalogFile(catalogName);
 		if (!catalogFile) {
-			throw runtime_error((format("Cannot open catalog file %1%") % catalogName).str());
+			throw runtime_error(format("Cannot open catalog file {}", catalogName.string()));
 		}
 
 		fs::path fsBasePath = inputPath;
@@ -1071,7 +1071,7 @@ int main(int argc, char ** argv)
 
 		ofstream image(imageName, ofstream::out | ofstream::binary | ofstream::trunc);
 		if (!image) {
-			throw runtime_error((format("Error creating image file %1%") % imageName).str());
+			throw runtime_error(format("Error creating image file {}", imageName.string()));
 		}
 
 		// Write the system area
@@ -1146,7 +1146,7 @@ int main(int argc, char ** argv)
 
 		// Close the image file
 		if (!image) {
-			throw runtime_error((format("Error writing to image file %1%") % imageName).str());
+			throw runtime_error(format("Error writing to image file {}", imageName.string()));
 		}
 		image.close();
 
@@ -1159,7 +1159,7 @@ int main(int argc, char ** argv)
 
 			ofstream cueFile(cueName, ofstream::out | ofstream::trunc);
 			if (!cueFile) {
-				throw runtime_error((format("Error creating cue file %1%") % cueName).str());
+				throw runtime_error(format("Error creating cue file {}", cueName.string()));
 			}
 
 			cueFile << "FILE " << imageName << " BINARY\r\n";
@@ -1167,7 +1167,7 @@ int main(int argc, char ** argv)
 			cueFile << "    INDEX 01 00:00:00\r\n";
 
 			if (!cueFile) {
-				throw runtime_error((format("Error writing to cue file %1%") % cueName).str());
+				throw runtime_error(format("Error writing to cue file {}", cueName.string()));
 			}
 			cueFile.close();
 

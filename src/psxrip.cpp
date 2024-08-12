@@ -18,7 +18,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
 //
 
-#include <stdint.h>
+#include <string.h>  // memset()
 
 #include <cdio/cdio.h>
 #include <cdio/cd_types.h>
@@ -31,15 +31,15 @@ extern "C" {
 #include <libvcd/sector.h>
 }
 
-#include <boost/format.hpp>
-using boost::format;
-
 #include <algorithm>
+#include <cstdint>
 #include <exception>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
 namespace fs = std::filesystem;
 using namespace std;
 
@@ -54,10 +54,10 @@ static char buffer[M2RAW_SECTOR_SIZE];
 // Print an ISO long-format time structure to a file.
 static void print_ltime(ofstream & f, const iso9660_ltime_t & l)
 {
-	f << format("%.4s-%.2s-%.2s %.2s:%.2s:%.2s.%.2s %d")
-	   % l.lt_year % l.lt_month % l.lt_day
-	   % l.lt_hour % l.lt_minute % l.lt_second % l.lt_hsecond
-	   % int(l.lt_gmtoff) << endl;
+	f << format("{:.4}-{:.2}-{:.2} {:.2}:{:.2}:{:.2}.{:.2} {}",
+	     l.lt_year, l.lt_month, l.lt_day,
+	     l.lt_hour, l.lt_minute, l.lt_second, l.lt_hsecond,
+	     int(l.lt_gmtoff)) << endl;
 }
 
 
@@ -66,14 +66,14 @@ static void dumpSystemArea(CdIo_t * image, const fs::path & fileName)
 {
 	ofstream file(fileName, ofstream::out | ofstream::binary | ofstream::trunc);
 	if (!file) {
-		throw runtime_error((format("Cannot create system area file %1%\n") % fileName).str());
+		throw runtime_error(format("Cannot create system area file {}\n", fileName.string()));
 	}
 
 	const size_t numSystemAreaSectors = 16;
 	for (size_t sector = 0; sector < numSystemAreaSectors; ++sector) {
 		driver_return_code_t r = cdio_read_mode2_sector(image, buffer, sector, true);
 		if (r != DRIVER_OP_SUCCESS) {
-			throw runtime_error((format("Error reading sector %1% of image file: %2%") % sector % cdio_driver_errmsg(r)).str());
+			throw runtime_error(format("Error reading sector {} of image file: {}", sector, cdio_driver_errmsg(r)));
 		}
 
 		if (buffer[2] != SM_DATA) {
@@ -84,7 +84,7 @@ static void dumpSystemArea(CdIo_t * image, const fs::path & fileName)
 
 		file.write(buffer + CDIO_CD_SUBHEADER_SIZE, CDIO_CD_FRAMESIZE);
 		if (!file) {
-			throw runtime_error((format("Cannot write to system area file %1%") % fileName).str());
+			throw runtime_error(format("Cannot write to system area file {}", fileName.string()));
 		}
 	}
 }
@@ -110,7 +110,7 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
 	// Read the directory entries
 	CdioList_t * entries = iso9660_fs_readdir(image, inputPath.c_str());
 	if (!entries) {
-		throw runtime_error((format("Error reading ISO 9660 directory '%1%'") % inputPath).str());
+		throw runtime_error(format("Error reading ISO 9660 directory '{}'", inputPath));
 	}
 
 	// Create the output directory
@@ -193,7 +193,7 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
 			fs::path outputFileName = outputDirName / entryName;
 			ofstream file(outputFileName, ofstream::out | ofstream::binary | ofstream::trunc);
 			if (!file) {
-				throw runtime_error((format("Cannot create output file %1%") % outputFileName).str());
+				throw runtime_error(format("Cannot create output file {}", outputFileName.string()));
 			}
 
 			size_t sizeRemaining = fileSize;
@@ -208,8 +208,8 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
 					r = cdio_read_data_sectors(image, buffer, stat->lsn + sector, blockSize, 1);
 				}
 				if (r != DRIVER_OP_SUCCESS) {
-					cerr << format("Error reading sector %1% of image file: %2%") % (stat->lsn + sector) % cdio_driver_errmsg(r) << endl;
-					cerr << format("Output file %1% may be incomplete") % outputFileName << endl;
+					cerr << format("Error reading sector {} of image file: {}", stat->lsn + sector, cdio_driver_errmsg(r)) << endl;
+					cerr << format("Output file {} may be incomplete", outputFileName.string()) << endl;
 					break;
 				}
 
@@ -217,7 +217,7 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
 
 				file.write(buffer, sizeToWrite);
 				if (!file) {
-					throw runtime_error((format("Cannot write to file %1%") % outputFileName).str());
+					throw runtime_error(format("Cannot write to file {}", outputFileName.string()));
 				}
 
 				sizeRemaining -= sizeToWrite;
@@ -252,7 +252,7 @@ static void dumpImage(CdIo_t * image, const fs::path & outputPath, bool writeLBN
 	// Create output catalog file
 	ofstream catalog(catalogName, ofstream::out | ofstream::trunc);
 	if (!catalog) {
-		throw runtime_error((format("Cannot create catalog file %1%") % catalogName).str());
+		throw runtime_error(format("Cannot create catalog file {}", catalogName.string()));
 	}
 
 	// Dump system area data
@@ -300,17 +300,17 @@ static void dumpLBNTable(CdIo_t * image, const string & inputPath = "", ostream 
 	// Read the directory entries
 	CdioList_t * entries = iso9660_fs_readdir(image, inputPath.c_str());
 	if (!entries) {
-		throw runtime_error((format("Error reading ISO 9660 directory '%1%'") % inputPath).str());
+		throw runtime_error(format("Error reading ISO 9660 directory '{}'", inputPath));
 	}
 
 	// Print table header before root directory
 	if (inputPath.empty()) {
-		output << boost::format("%8s %8s %8s T Path") % "LBN" % "NumSec" % "Size" << endl;
+		output << format("{:>8} {:>8} {:>8} T Path", "LBN", "NumSec", "Size") << endl;
 	}
 
 	// Print entry for directory itself
 	iso9660_stat_t * stat = static_cast<iso9660_stat_t *>(_cdio_list_node_data(_cdio_list_begin(entries)));  // "." entry
-	output << boost::format("%08x %08x %08x d %s") % stat->lsn % stat->secsize % stat->size % inputPath << endl;
+	output << format("{:08x} {:08x} {:08x} d {}", stat->lsn, stat->secsize, stat->size, inputPath) << endl;
 
 	// Sort entries by sector number
 	vector<iso9660_stat_t *> sortedChildren;
@@ -358,7 +358,7 @@ static void dumpLBNTable(CdIo_t * image, const string & inputPath = "", ostream 
 				}
 			}
 
-			output << boost::format("%08x %08x %08x %c %s") % stat->lsn % stat->secsize % fileSize % typeChar % entryPath << endl;
+			output << format("{:08x} {:08x} {:08x} {:c} {}", stat->lsn, stat->secsize, fileSize, typeChar, entryPath) << endl;
 		}
 	}
 }
@@ -436,7 +436,7 @@ int main(int argc, const char ** argv)
 
 		CdIo_t * image = cdio_open(inputPath.string().c_str(), DRIVER_BINCUE);
 		if (image == NULL) {
-			throw runtime_error((format("Error opening input image %1%, or image has wrong type") % inputPath).str());
+			throw runtime_error(format("Error opening input image {}, or image has wrong type", inputPath.string()));
 		}
 
 		cout << "Analyzing image " << inputPath << "...\n";
@@ -463,7 +463,7 @@ int main(int argc, const char ** argv)
 		track_format_t trackFormat = cdio_get_track_format(image, firstTrack);
 		cdio_info("Track format = %d", trackFormat);
 		if (trackFormat != TRACK_FORMAT_DATA && trackFormat != TRACK_FORMAT_XA) {
-			throw runtime_error((format("First track (%1%) is not a data track") % firstTrack).str());
+			throw runtime_error(format("First track ({}) is not a data track", firstTrack));
 		}
 
 		msf_t startMSF;
