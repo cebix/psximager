@@ -31,10 +31,10 @@ extern "C" {
 #include <string.h>
 #include <time.h>
 
-#include <boost/algorithm/string/trim.hpp>
 #include <boost/lexical_cast.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
@@ -43,6 +43,7 @@ extern "C" {
 #include <iostream>
 #include <memory>
 #include <queue>
+#include <ranges>
 #include <regex>
 #include <string>
 #include <vector>
@@ -311,7 +312,10 @@ static string nextline(ifstream & file)
 
 	while (line.empty() && file) {
 		getline(file, line);
-		boost::trim(line);
+
+		auto is_space = [](char c) -> bool { return std::isspace(static_cast<unsigned char>(c)); };
+		auto trimmed = line | views::drop_while(is_space) | views::reverse | views::drop_while(is_space) | views::reverse;
+		line = string(begin(trimmed), end(trimmed));
 	}
 
 	return line;
