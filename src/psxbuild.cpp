@@ -36,13 +36,13 @@ extern "C" {
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
-#include <boost/scoped_array.hpp>
 using boost::format;
 
 #include <algorithm>
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <queue>
 #include <string>
 #include <vector>
@@ -899,7 +899,7 @@ static void writeSystemArea(ofstream & image, const Catalog & cat)
 	const size_t numSystemSectors = 16;
 	const size_t systemAreaSize = numSystemSectors * CDIO_CD_FRAMESIZE;
 
-	boost::scoped_array<char> data(new char[systemAreaSize]);
+	unique_ptr<char[]> data(new char[systemAreaSize]);
 	memset(data.get(), 0, systemAreaSize);
 
 	size_t fileSize = 0;
