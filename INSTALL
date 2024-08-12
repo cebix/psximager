@@ -21,8 +21,31 @@ PSXImager can be compiled and installed in the usual way:
   $ ./bootstrap
   $ ./configure
   $ make
-  [become root if necessary]
-  # make install
+  $ sudo make install
 
 Installation is not strictly necessary; the three binaries built in the
 "src" directory are stand-alone programs.
+
+
+Installation for Windows
+========================
+
+You can build PSXImager for Windows using the MSYS2 environment.
+
+  1. Download MSYS2 from the official website: https://www.msys2.org/
+  2. After installation, open "mingw32.exe" in MSYS2 root folder.
+  3. Install compiler and necessary packages:
+
+     pacman -S --noconfirm autoconf automake make
+     pacman -S --noconfirm mingw-w64-i686-toolchain mingw-w64-i686-boost \
+         mingw-w64-i686-libcdio mingw-w64-i686-vcdimager
+
+  4. Run build commands:
+
+     ./bootstrap
+     ./configure --host=i686-w64-mingw32 --with-boost=/mingw32 \
+         LDFLAGS="-s -static"
+     make
+
+The three binaries built in the "src" directory are stand-alone and can be
+run on any Windows machine (no additional libraries needed).
