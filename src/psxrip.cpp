@@ -63,7 +63,7 @@ static void print_ltime(ofstream & f, const iso9660_ltime_t & l)
 // Dump system area data from image to file.
 static void dumpSystemArea(CdIo_t * image, const boost::filesystem::path & fileName)
 {
-	ofstream file(fileName.c_str(), ofstream::out | ofstream::binary | ofstream::trunc);
+	ofstream file(fileName, ofstream::out | ofstream::binary | ofstream::trunc);
 	if (!file) {
 		throw runtime_error((format("Cannot create system area file %1%\n") % fileName).str());
 	}
@@ -190,7 +190,7 @@ static void dumpFilesystem(CdIo_t * image, ofstream & catalog, bool writeLBNs,
 
 			// Dump the file contents
 			boost::filesystem::path outputFileName = outputDirName / entryName;
-			ofstream file(outputFileName.c_str(), ofstream::out | ofstream::binary | ofstream::trunc);
+			ofstream file(outputFileName, ofstream::out | ofstream::binary | ofstream::trunc);
 			if (!file) {
 				throw runtime_error((format("Cannot create output file %1%") % outputFileName).str());
 			}
@@ -249,7 +249,7 @@ static void dumpImage(CdIo_t * image, const boost::filesystem::path & outputPath
 	systemAreaName.replace_extension(".sys");
 
 	// Create output catalog file
-	ofstream catalog(catalogName.c_str(), ofstream::out | ofstream::trunc);
+	ofstream catalog(catalogName, ofstream::out | ofstream::trunc);
 	if (!catalog) {
 		throw runtime_error((format("Cannot create catalog file %1%") % catalogName).str());
 	}
@@ -366,7 +366,7 @@ static void dumpLBNTable(CdIo_t * image, const string & inputPath = "", ostream 
 // Print usage information and exit.
 static void usage(const char * progname, int exitcode = 0, const string & error = "")
 {
-	cout << "Usage: " << boost::filesystem::path(progname).filename().native() << " [OPTION...] <input>[.bin/cue] [<output_dir>]" << endl;
+	cout << "Usage: " << boost::filesystem::path(progname).filename() << " [OPTION...] <input>[.bin/cue] [<output_dir>]" << endl;
 	cout << "  -l, --lbns                      Write LBNs to catalog file" << endl;
 	cout << "  -t, --lbn-table                 Print LBN table and exit" << endl;
 	cout << "  -v, --verbose                   Be verbose" << endl;
@@ -433,7 +433,7 @@ int main(int argc, const char ** argv)
 			inputPath.replace_extension(".bin");
 		}
 
-		CdIo_t * image = cdio_open(inputPath.c_str(), DRIVER_BINCUE);
+		CdIo_t * image = cdio_open(inputPath.string().c_str(), DRIVER_BINCUE);
 		if (image == NULL) {
 			throw runtime_error((format("Error opening input image %1%, or image has wrong type") % inputPath).str());
 		}

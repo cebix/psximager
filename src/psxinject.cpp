@@ -48,7 +48,7 @@ using namespace std;
 // Print usage information and exit.
 static void usage(const char * progname, int exitcode = 0, const string & error = "")
 {
-	cout << "Usage: " << boost::filesystem::path(progname).filename().native() << " [OPTION...] <input>[.bin/cue] <repl_file_path> <new_file>" << endl;
+	cout << "Usage: " << boost::filesystem::path(progname).filename() << " [OPTION...] <input>[.bin/cue] <repl_file_path> <new_file>" << endl;
 	cout << "  -v, --verbose                   Be verbose" << endl;
 	cout << "  -V, --version                   Display version information and exit" << endl;
 	cout << "  -?, --help                      Show this help message" << endl;
@@ -109,7 +109,7 @@ int main(int argc, char ** argv)
 			imagePath.replace_extension(".bin");
 		}
 
-		CdIo_t * image = cdio_open(imagePath.c_str(), DRIVER_BINCUE);
+		CdIo_t * image = cdio_open(imagePath.string().c_str(), DRIVER_BINCUE);
 		if (image == NULL) {
 			throw runtime_error((format("Error opening input image %1%, or image has wrong type") % imagePath).str());
 		}
@@ -255,10 +255,10 @@ int main(int argc, char ** argv)
 		cdio_destroy(image);
 
 		imagePath.replace_extension(".bin");
-		fstream writeImage(imagePath.c_str(), fstream::in | fstream::out | fstream::binary);
+		fstream writeImage(imagePath, fstream::in | fstream::out | fstream::binary);
 
 		// Read the new file and inject it
-		ifstream file(newFileName.c_str(), ifstream::in | ifstream::binary);
+		ifstream file(newFileName, ifstream::in | ifstream::binary);
 		if (!file) {
 			throw runtime_error((format("Cannot open file %1%") % newFileName).str());
 		}
