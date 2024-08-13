@@ -31,10 +31,9 @@ extern "C" {
 #include <string.h>
 #include <time.h>
 
-#include <boost/lexical_cast.hpp>
-
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
@@ -65,6 +64,15 @@ static const uint8_t emptySector[M2F2_SECTOR_SIZE] = {0};
 
 // Maximum number of sectors in an image
 const uint32_t MAX_ISO_SECTORS = 74 * 60 * 75;  // 74 minutes
+
+
+// Convert string to integer.
+static bool str_to_num(const string & s, auto & value)
+{
+	auto end = s.data() + s.size();
+	auto result = from_chars(s.data(), end, value);
+	return result.ec == errc() && result.ptr == end;
+}
 
 
 // Create an ISO long-format time structure from an ISO8601-like string
@@ -100,9 +108,7 @@ static void parse_ltime(const string & s, iso9660_ltime_t & t)
 	t.lt_hsecond[0] = m.str(7)[0];
 	t.lt_hsecond[1] = m.str(7)[1];
 
-	try {
-		t.lt_gmtoff = boost::lexical_cast<int>(m[8]);
-	} catch (const boost::bad_lexical_cast &) {
+	if (! str_to_num(m[8], t.lt_gmtoff)) {
 		throw runtime_error(format("'{}' is not a valid GMT offset specification", m[8].str()));
 	}
 }
@@ -366,12 +372,11 @@ static uint32_t checkLBN(const string & s, const string & itemName)
 {
 	uint32_t lbn = 0;
 	if (!s.empty()) {
-		try {
-			lbn = boost::lexical_cast<uint32_t>(s);
+		if (str_to_num(s, lbn)) {
 			if (lbn <= ISO_EVD_SECTOR || lbn >= MAX_ISO_SECTORS) {
 				throw runtime_error(format("Start LBN '{}' of '{}' is outside the valid range {}..{}", s, itemName, (unsigned) ISO_EVD_SECTOR, MAX_ISO_SECTORS));
 			}
-		} catch (const boost::bad_lexical_cast &) {
+		} else {
 			throw runtime_error(format("Invalid start LBN '{}' specified for '{}'", s, itemName));
 		}
 	}
@@ -516,18 +521,14 @@ static void parseVolume(ifstream & catalogFile, Catalog & cat)
 		} else if (regex_match(line, m, defaultUIDSpec)) {
 
 			// Default user ID specification
-			try {
-				cat.defaultUID = boost::lexical_cast<uint16_t>(m[1]);
-			} catch (boost::bad_lexical_cast &) {
+			if (! str_to_num(m[1], cat.defaultUID)) {
 				throw runtime_error(format("'{}' is not a valid user ID", m[1].str()));
 			}
 
 		} else if (regex_match(line, m, defaultGIDSpec)) {
 
 			// Default group ID specification
-			try {
-				cat.defaultGID = boost::lexical_cast<uint16_t>(m[1]);
-			} catch (boost::bad_lexical_cast &) {
+			if (! str_to_num(m[1], cat.defaultGID)) {
 				throw runtime_error(format("'{}' is not a valid group ID", m[1].str()));
 			}
 

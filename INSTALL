@@ -3,9 +3,6 @@ Prerequisites
 
 A C++20 compiler.
 
-Boost C++ libraries >= 1.50.0
-  http://www.boost.org/
-
 libcdio and libiso9660 >= 2.0.0
   http://www.gnu.org/software/libcdio/
 
@@ -37,14 +34,13 @@ You can build PSXImager for Windows using the MSYS2 environment.
   3. Install compiler and necessary packages:
 
      pacman -S --noconfirm autoconf automake make
-     pacman -S --noconfirm mingw-w64-i686-toolchain mingw-w64-i686-boost \
+     pacman -S --noconfirm mingw-w64-i686-toolchain \
          mingw-w64-i686-libcdio mingw-w64-i686-vcdimager
 
   4. Run build commands:
 
      ./bootstrap
-     ./configure --host=i686-w64-mingw32 --with-boost=/mingw32 \
-         LDFLAGS="-s -static"
+     ./configure --host=i686-w64-mingw32 LDFLAGS="-s -static"
      make
 
 The three binaries built in the "src" directory are stand-alone and can be
