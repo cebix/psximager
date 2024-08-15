@@ -44,7 +44,7 @@ namespace fs = std::filesystem;
 using namespace std;
 
 
-#define TOOL_VERSION "PSXRip 2.1"
+#define TOOL_VERSION "PSXRip 2.2"
 
 
 // Sector buffer

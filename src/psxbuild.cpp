@@ -49,7 +49,7 @@ extern "C" {
 namespace fs = std::filesystem;
 using namespace std;
 
-#define TOOL_VERSION "PSXBuild 2.1"
+#define TOOL_VERSION "PSXBuild 2.2"
 
 
 struct FileNode;
